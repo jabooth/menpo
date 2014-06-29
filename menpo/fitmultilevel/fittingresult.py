@@ -19,7 +19,7 @@ class MultilevelFittingResult(FittingResult):
     multiple_fitter: :class:`menpo.fitter.base.Fitter`
         The fitter object used to fitter the image.
 
-    fittings: :class:`menpo.fitter.fittingresult.FittingResult` list
+    fitting_results: :class:`menpo.fitter.fittingresult.FittingResult` list
         A list of basic fitting objects.
 
     affine_correction: :class: `menpo.transforms.affine.Affine`
@@ -38,10 +38,10 @@ class MultilevelFittingResult(FittingResult):
         Default: 'me_norm'
     """
 
-    def __init__(self, image, multiple_fitter, fittings, affine_correction,
+    def __init__(self, image, multiple_fitter, fitting_results, affine_correction,
                  gt_shape=None, error_type='me_norm'):
         self._error_stop = None  # Internal attribute of error_type setter
-        self.fittings = fittings
+        self.fitting_results = fitting_results
         self._affine_correction = affine_correction
         super(MultilevelFittingResult, self).__init__(
             image, multiple_fitter, gt_shape=gt_shape, error_type=error_type)
@@ -63,32 +63,32 @@ class MultilevelFittingResult(FittingResult):
     @property
     def scaled_levels(self):
         r"""
-        Returns True if the shape results returned by the basic fittings
+        Returns True if the shape results returned by the basic fitting_results
         must be scaled.
         """
-        return self.fitter.scaled_levels
+        return True  # self.fitter.scaled_levels
 
     @property
     def fitted(self):
         r"""
         Returns the fitted state of each fitting object.
         """
-        return [f.fitted for f in self.fittings]
+        return [f.fitted for f in self.fitting_results]
 
     @FittingResult.error_type.setter
     def error_type(self, error_type):
         r"""
         Sets the error type according to a set of predefined options.
         """
-        if error_type is 'me_norm':
-            for f in self.fittings:
+        if error_type == 'me_norm':
+            for f in self.fitting_results:
                 f.error_type = error_type
             self._error_stop = 0.1
             self._error_text = 'Point-to-point error normalized by object ' \
                                'size'
-        elif error_type is 'me':
+        elif error_type == 'me':
             NotImplementedError("erro_type 'me' not implemented yet")
-        elif error_type is 'rmse':
+        elif error_type == 'rmse':
             NotImplementedError("error_type 'rmse' not implemented yet")
         else:
             raise ValueError("Unknown error_type string selected. Valid"
@@ -101,7 +101,7 @@ class MultilevelFittingResult(FittingResult):
         Returns the total number of iterations used to fitter the image.
         """
         n_iters = 0
-        for f in self.fittings:
+        for f in self.fitting_results:
             n_iters += f.n_iters
         return n_iters
 
@@ -126,7 +126,7 @@ class MultilevelFittingResult(FittingResult):
         n = self.n_levels - 1
 
         shapes = []
-        for j, f in enumerate(self.fittings):
+        for j, f in enumerate(self.fitting_results):
             if self.scaled_levels:
                 transform = Scale(self.downscale**(n-j), 2)
                 for t in f.shapes(as_points=as_points):
@@ -144,7 +144,7 @@ class MultilevelFittingResult(FittingResult):
         Returns the final fitted shape.
         """
         return self._affine_correction.apply(
-            self.fittings[-1].final_shape)
+            self.fitting_results[-1].final_shape)
 
     @property
     def initial_shape(self):
@@ -153,7 +153,7 @@ class MultilevelFittingResult(FittingResult):
         """
         n = self.n_levels - 1
 
-        initial_shape = self.fittings[0].initial_shape
+        initial_shape = self.fitting_results[0].initial_shape
         if self.scaled_levels:
             Scale(self.downscale ** n,
                   initial_shape.n_dims).apply_inplace(initial_shape)
@@ -187,13 +187,10 @@ class MultilevelFittingResult(FittingResult):
             raise ValueError('Ground truth shape has not been set, error '
                              'cannot be plotted')
 
-    # TODO : this should overwrite __str__
-    def print_fitting_info(self):
-        r"""
-        Prints information related to the fitting.
-        """
-        print "Initial error: {}".format(self.initial_error)
-        print "Final error: {}".format(self.final_error)
+    def __str__(self):
+        out = "Initial error: {0:.4f}\nFinal error: {1:.4f}".format(
+            self.initial_error, self.final_error)
+        return out
 
 
 class AAMMultilevelFittingResult(MultilevelFittingResult):
@@ -235,7 +232,7 @@ class AAMMultilevelFittingResult(MultilevelFittingResult):
         each basic fitting.
         """
         # TODO: ensure that all basic_fitting residuals are the same?
-        return self.fittings[-1].residual.type
+        return self.fitting_results[-1].residual.type
 
     @property
     def costs(self):
@@ -254,14 +251,14 @@ class AAMMultilevelFittingResult(MultilevelFittingResult):
         r"""
         Returns the final fitting cost.
         """
-        return self.fittings[-1].final_cost
+        return self.fitting_results[-1].final_cost
 
     @property
     def initial_cost(self):
         r"""
         Returns the initial fitting cost.
         """
-        return self.fittings[0].initial_cost
+        return self.fitting_results[0].initial_cost
 
     def warped_images(self, from_basic_fittings=False, as_pixels=False):
         r"""
@@ -270,35 +267,31 @@ class AAMMultilevelFittingResult(MultilevelFittingResult):
 
         Parameters
         -----------
-        from_basic_fittings: boolean, optional
-            If True, the returned transform per iteration is used to warp
+        from_basic_fittings : `boolean`, optional
+            If ``True``, the returned transform per iteration is used to warp
             the internal image representation used by each basic fitter.
-            If False, the transforms are used to warp original image.
+            If ``False``, the transforms are used to warp original image.
 
-            Default: False
-
-        as_pixels: boolean, optional
-            Whether the result is returned as a list of Images or
-            ndarrays.
-
-            Default: False
+        as_pixels : `boolean`, optional
+            Whether the result is returned as a list of :map:`Image` or
+            `ndarray`.
 
         Returns
         -------
-        warped_images: :class:`pybug.image.masked.MaskedImage` or ndarray list
+        warped_images : :map:`MaskedImage` or `ndarray` list
             A list containing the warped images obtained at each fitting
             iteration.
         """
         if from_basic_fittings:
             return self._flatten_out([f.warped_images(as_pixels=as_pixels)
-                                      for f in self.fittings])
+                                      for f in self.fitting_results])
         else:
-            mask = self.fittings[-1].fitter.template.mask
-            transform = self.fittings[-1].fitter.transform
-            interpolator = self.fittings[-1].fitter.interpolator
+            mask = self.fitting_results[-1].fitter.template.mask
+            transform = self.fitting_results[-1].fitter.transform
+            interpolator = self.fitting_results[-1].fitter.interpolator
             warped_images = []
             for t in self.shapes():
-                transform.target = t
+                transform.set_target(t)
                 image = self.image.warp_to(mask, transform,
                                            interpolator=interpolator)
                 if as_pixels:
@@ -314,23 +307,20 @@ class AAMMultilevelFittingResult(MultilevelFittingResult):
         each fitting iteration.
 
         Parameters
-        -----------
-        as_pixels: boolean, optional
-            Whether the result is returned as a list of Images or
-            ndarrays.
-
-            Default: False
+        ----------
+        as_pixels : `boolean`, optional
+            Whether the result is returned as a list of :map:`Image` or
+            `ndarray`.
 
         Returns
         -------
-        appearance_reconstructions: :class:`pybug.image.masked.MaskedImage`
-                                    or ndarray list
+        appearance_reconstructions : :map:`MaskedImage` or `ndarray` list
             A list containing the appearance reconstructions obtained at each
             fitting iteration.
         """
         return self._flatten_out(
             [f.appearance_reconstructions(as_pixels=as_pixels)
-             for f in self.fittings])
+             for f in self.fitting_results])
 
     def plot_cost(self, figure_id=None, new_figure=False, **kwargs):
         r"""

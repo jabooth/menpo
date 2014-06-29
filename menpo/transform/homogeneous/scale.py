@@ -12,13 +12,13 @@ def Scale(scale_factor, n_dims=None):
 
     A :class:`UniformScale` will be produced if:
 
-        - A float ``scale_factor`` and a ``n_dims`` kwarg are provided
-        - A ndarray scale_factor with shape (``n_dims``, ) is provided with all
+        - A float `scale_factor` and a `n_dims` kwarg are provided
+        - A ndarray scale_factor with shape (`n_dims`, ) is provided with all
           elements being the same
 
     A :class:`NonUniformScale` will be provided if:
 
-        - A ndarray ``scale_factor`` with shape (``n_dims``, ) is provided with
+        - A ndarray `scale_factor` with shape (`n_dims`, ) is provided with
           at least two differing scale factors.
 
     Parameters
@@ -58,28 +58,32 @@ def Scale(scale_factor, n_dims=None):
 
 class NonUniformScale(DiscreteAffine, Affine):
     r"""
-    An ``n_dims`` scale transform, with a scale component for each dimension.
+    An `n_dims` scale transform, with a scale component for each dimension.
 
     Parameters
     ----------
-    scale : (D,) ndarray
+    scale : ``(n_dims,)`` `ndarray`
         A scale for each axis.
     """
 
-    def __init__(self, scale):
+    def __init__(self, scale, skip_checks=False):
         scale = np.asarray(scale)
+        if not skip_checks:
+            if scale.size > 3 or scale.size < 2:
+                raise ValueError("NonUniformScale can only be 2D or 3D"
+                                 ", not {}".format(scale.size))
         h_matrix = np.eye(scale.size + 1)
         np.fill_diagonal(h_matrix, scale)
         h_matrix[-1, -1] = 1
-        Affine.__init__(self, h_matrix)
+        Affine.__init__(self, h_matrix, skip_checks=True, copy=False)
 
     @classmethod
     def identity(cls, n_dims):
         return NonUniformScale(np.ones(n_dims))
 
-    def set_h_matrix(self, value):
-        raise NotImplementedError("The h_matrix cannot "
-                                  "be set on a NonUniformScale.")
+    @property
+    def h_matrix_is_mutable(self):
+        return False
 
     @property
     def scale(self):
@@ -91,22 +95,22 @@ class NonUniformScale(DiscreteAffine, Affine):
         return self.h_matrix.diagonal()[:-1]
 
     def _transform_str(self):
-        message = 'NonUniformScale by %s ' % self.scale
+        message = 'NonUniformScale by {}'.format(self.scale)
         return message
 
     @property
     def n_parameters(self):
         """
-        The number of parameters: ``n_dims``.
+        The number of parameters: `n_dims`.
 
         :type: int
 
-        ``n_dims`` parameters - ``[scale_x, scale_y, ....]`` - The scalar values
+        `n_dims` parameters - `[scale_x, scale_y, ....]` - The scalar values
         representing the scale across each axis.
         """
         return self.scale.size
 
-    def as_vector(self):
+    def _as_vector(self):
         r"""
         Return the parameters of the transform as a 1D array. These parameters
         are parametrised as deltas from the identity warp. The parameters
@@ -154,7 +158,11 @@ class NonUniformScale(DiscreteAffine, Affine):
 
         :type: :class:`NonUniformScale`
         """
-        return NonUniformScale(1.0 / self.scale)
+        return NonUniformScale(1.0 / self.scale, skip_checks=True)
+
+    def d_dp(self, points):
+        # TODO d_dp on NonUniformScale
+        return NotImplementedError("d_dp is not implemented on a NonUniformScale")
 
 
 class UniformScale(DiscreteAffine, Similarity):
@@ -164,11 +172,16 @@ class UniformScale(DiscreteAffine, Similarity):
     code duplication.
     """
 
-    def __init__(self, scale, n_dims):
+    def __init__(self, scale, n_dims, skip_checks=False):
+        if not skip_checks:
+            if n_dims > 3 or n_dims < 2:
+                raise ValueError("UniformScale can only be 2D or 3D"
+                                 ", not {}".format(n_dims))
         h_matrix = np.eye(n_dims + 1)
         np.fill_diagonal(h_matrix, scale)
         h_matrix[-1, -1] = 1
-        Similarity.__init__(self, h_matrix)
+        Similarity.__init__(self, h_matrix, copy=False,
+                            skip_checks=False)
 
     @classmethod
     def identity(cls, n_dims):
@@ -184,7 +197,7 @@ class UniformScale(DiscreteAffine, Similarity):
         return self.h_matrix[0, 0]
 
     def _transform_str(self):
-        message = 'UniformScale by %f ' % self.scale
+        message = 'UniformScale by {}'.format(self.scale)
         return message
 
     @property
@@ -196,7 +209,7 @@ class UniformScale(DiscreteAffine, Similarity):
         """
         return 1
 
-    def as_vector(self):
+    def _as_vector(self):
         r"""
         Return the parameters of the transform as a 1D array. These parameters
         are parametrised as deltas from the identity warp. The parameters
@@ -213,7 +226,7 @@ class UniformScale(DiscreteAffine, Similarity):
         s : double
             The scale across each axis.
         """
-        return self.scale
+        return np.asarray(self.scale)
 
     def from_vector_inplace(self, p):
         np.fill_diagonal(self.h_matrix, p)
@@ -229,7 +242,11 @@ class UniformScale(DiscreteAffine, Similarity):
 
         :type: type(self)
         """
-        return type(self)(1.0 / self.scale, self.n_dims)
+        return UniformScale(1.0 / self.scale, self.n_dims, skip_checks=True)
+
+    def d_dp(self, points):
+        # TODO d_dp on UniformScale
+        raise NotImplementedError("d_dp is not implemented on UniformScale.")
 
 
 class AlignmentUniformScale(HomogFamilyAlignment, UniformScale):
@@ -248,5 +265,13 @@ class AlignmentUniformScale(HomogFamilyAlignment, UniformScale):
         np.fill_diagonal(self.h_matrix, new_scale)
         self.h_matrix[-1, -1] = 1
 
-    def copy_without_alignment(self):
+    def as_non_alignment(self):
+        r"""Returns a copy of this uniform scale without it's alignment nature.
+
+        Returns
+        -------
+        transform : :map:`UniformScale`
+            A version of this scale with the same transform behavior but
+            without the alignment logic.
+        """
         return UniformScale(self.scale, self.n_dims)

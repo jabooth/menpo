@@ -15,30 +15,31 @@ class Translation(DiscreteAffine, Similarity):
         The translation in each axis.
     """
 
-    def __init__(self, translation):
+    def __init__(self, translation, skip_checks=False):
         translation = np.asarray(translation)
         h_matrix = np.eye(translation.shape[0] + 1)
         h_matrix[:-1, -1] = translation
-        Similarity.__init__(self, h_matrix)
+        Similarity.__init__(self, h_matrix, copy=False,
+                            skip_checks=skip_checks)
 
     @classmethod
     def identity(cls, n_dims):
         return Translation(np.zeros(n_dims))
 
     def _transform_str(self):
-        message = 'Translate by %s ' % self.translation_component
+        message = 'Translation by {}'.format(self.translation_component)
         return message
 
     @property
     def n_parameters(self):
         r"""
-        The number of parameters: ``n_dims``
+        The number of parameters: `n_dims`
 
         :type: int
         """
         return self.n_dims
 
-    def as_vector(self):
+    def _as_vector(self):
         r"""
         Return the parameters of the transform as a 1D array. These parameters
         are parametrised as deltas from the identity warp. The parameters
@@ -71,6 +72,10 @@ class Translation(DiscreteAffine, Similarity):
         """
         return Translation(-self.translation_component)
 
+    def d_dp(self, points):
+        # TODO implement d_dp for Translation
+        return NotImplementedError("d_dp is not implemented for Translation")
+
 
 class AlignmentTranslation(HomogFamilyAlignment, Translation):
 
@@ -86,5 +91,13 @@ class AlignmentTranslation(HomogFamilyAlignment, Translation):
         translation = self.target.centre - self.source.centre
         self.h_matrix[:-1, -1] = translation
 
-    def copy_without_alignment(self):
+    def as_non_alignment(self):
+        r"""Returns a copy of this translation without it's alignment nature.
+
+        Returns
+        -------
+        transform : :map:`Translation`
+            A version of this transform with the same transform behavior but
+            without the alignment logic.
+        """
         return Translation(self.translation_component)

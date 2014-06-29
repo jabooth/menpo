@@ -1,30 +1,31 @@
+import os
 from setuptools import setup, find_packages
-from Cython.Build import cythonize
-import numpy as np
+import versioneer
 
 
-# ---- C/C++ EXTENSIONS ---- #
-cython_modules = ["menpo/geodesics/kirsanov.pyx",
-                  "menpo/shape/mesh/cpptrimesh.pyx",
-                  "menpo/shape/mesh/normals.pyx",
-                  "menpo/interpolation/cinterp.pyx",
-                  "menpo/transform/piecewiseaffine/fastpwa.pyx",
-                  "menpo/features/cppimagewindowiterator.pyx"]
+on_rtd = os.environ.get('READTHEDOCS', None) == 'True'
 
-cython_exts = cythonize(cython_modules, quiet=True)
+if on_rtd:
+    install_requires = []
+    ext_modules = []
+    include_dirs = []
+    cython_exts = []
+else:
+    from Cython.Build import cythonize
+    import numpy as np
 
-setup(name='menpo',
-      version='0.2',
-      description='iBUG Facial Modelling Toolkit',
-      author='James Booth',
-      author_email='james.booth08@imperial.ac.uk',
-      include_dirs=[np.get_include()],
-      ext_modules=cython_exts,
-      packages=find_packages(),
-      install_requires=[# Core
+    # ---- C/C++ EXTENSIONS ---- #
+    cython_modules = ["menpo/shape/mesh/normals.pyx",
+                      "menpo/transform/piecewiseaffine/fastpwa.pyx",
+                      "menpo/image/feature/cppimagewindowiterator.pyx"]
+
+    cython_exts = cythonize(cython_modules, quiet=True)
+    include_dirs = [np.get_include()]
+    install_requires = [# Core
                         'numpy>=1.8.0',
-                        'scipy>=0.12.0',
-                        'Cython>=0.20.1',  # req on OS X Mavericks
+                        'scipy>=0.14.0',
+                        'Cython>=0.20.1',
+                        'pathlib>=1.0',
 
                         # Image
                         'Pillow>=2.0.0',
@@ -38,17 +39,30 @@ setup(name='menpo',
                         'cyassimp>=0.1.3',
 
                         # Rasterization
-                        'cyrasterize>=0.1.4',
+                        'cyrasterize>=0.1.5',
 
                         # Visualization
                         'matplotlib>=1.2.1',
+                        'mayavi>=4.3.0']
 
-                        # Need to decide if this is really needed
-                        'decorator>=3.4.0',
+# Versioneer allows us to automatically generate versioning from
+# our git tagging system which makes releases simpler.
+versioneer.VCS = 'git'
+versioneer.versionfile_source = 'menpo/_version.py'
+versioneer.versionfile_build = 'menpo/_version.py'
+versioneer.tag_prefix = 'v'  # tags are like v1.2.0
+versioneer.parentdir_prefix = 'menpo-'  # dirname like 'menpo-v1.2.0'
 
-                        # Docs and testing
-                        'Sphinx>=1.2b1',
-                        'numpydoc>=0.4',
-                        'nose>=1.3.0'],
-      extras_require={'3d': 'mayavi>=4.3.0'}
-      )
+setup(name='menpo',
+      version=versioneer.get_version(),
+      cmdclass=versioneer.get_cmdclass(),
+      description='iBUG Facial Modelling Toolkit',
+      author='James Booth',
+      author_email='james.booth08@imperial.ac.uk',
+      include_dirs=include_dirs,
+      ext_modules=cython_exts,
+      packages=find_packages(),
+      install_requires=install_requires,
+      package_data={'menpo': ['data/*']},
+      tests_require=['nose>=1.3.0', 'mock>=1.0.1']
+)

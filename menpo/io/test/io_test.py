@@ -1,32 +1,64 @@
 import os
-import menpo.io as pio
-from menpo.shape import TriMesh
-from numpy.testing import assert_allclose
+from nose.tools import raises
 import numpy as np
 
+import menpo.io as mio
+from menpo.shape import TriMesh, TexturedTriMesh, PointCloud
+from menpo.image import Image, MaskedImage
+from numpy.testing import assert_allclose
+
 # ground truth bunny landmarks
-bunny_l_eye = np.array([[-0.09009447,  0.13760692,  0.02303147]])
-bunny_r_eye = np.array([[-0.06041192,  0.13871727,  0.03462752]])
-bunny_nose = np.array([[-0.07949748,  0.12401747,  0.05170817]])
-bunny_mouth = np.array([[-0.08876467,  0.11684129,  0.04538456],
-                        [-0.08044379,  0.11318078,  0.04642309],
-                        [-0.07329408,  0.11268603,  0.04844998],
-                        [-0.0670796 ,  0.11644761,  0.0498054 ]])
+bunny_leye = np.array([[-0.0907334573249135,
+                         0.13944519477304135,
+                         0.016432549244098166]])
+bunny_reye = np.array([[-0.06188841143305087,
+                         0.1404748336910087,
+                         0.03628544974441027]])
+bunny_nose = np.array([[-0.0824712814601403,
+                        0.12724167358964233,
+                        0.051332619501298894]])
+bunny_mouth = np.array([[-0.08719271323528464,
+                         0.11440556680892036,
+                         0.044485263772198975],
+                        [-0.0733831000935048,
+                         0.11610087742529278,
+                         0.051836298703986136]])
 
 
 def test_import_asset_bunny():
-    mesh = pio.import_builtin_asset('bunny.obj')
+    mesh = mio.import_builtin_asset('bunny.obj')
     assert(isinstance(mesh, TriMesh))
+    assert(isinstance(mesh.points, np.ndarray))
+    assert(mesh.points.shape[1] == 3)
+    assert(isinstance(mesh.trilist, np.ndarray))
+    assert(mesh.trilist.shape[1] == 3)
+
+
+def test_import_asset_james():
+    mesh = mio.import_builtin_asset('james.obj')
+    assert(isinstance(mesh, TexturedTriMesh))
+    assert(isinstance(mesh.points, np.ndarray))
+    assert(mesh.points.shape[1] == 3)
+    assert(isinstance(mesh.trilist, np.ndarray))
+    assert(mesh.trilist.shape[1] == 3)
+    assert(isinstance(mesh.texture, MaskedImage))
+    print mesh.tcoords
+    assert(isinstance(mesh.tcoords, PointCloud))
+    assert(mesh.tcoords.points.shape[1] == 2)
+
+@raises(ValueError)
+def test_import_incorrect_built_in():
+    mio.import_builtin_asset('adskljasdlkajd.obj')
 
 
 def test_json_landmarks_bunny():
-    mesh = pio.import_builtin_asset('bunny.obj')
+    mesh = mio.import_builtin_asset('bunny.obj')
     assert('JSON' in mesh.landmarks.group_labels)
     lms = mesh.landmarks['JSON']
-    labels = {'r_eye', 'mouth', 'nose', 'l_eye'}
+    labels = {'reye', 'mouth', 'nose', 'leye'}
     assert(len(labels - set(lms.labels)) == 0)
-    assert_allclose(lms['l_eye'].lms.points, bunny_l_eye, atol=1e-7)
-    assert_allclose(lms['r_eye'].lms.points, bunny_r_eye, atol=1e-7)
+    assert_allclose(lms['leye'].lms.points, bunny_leye, atol=1e-7)
+    assert_allclose(lms['reye'].lms.points, bunny_reye, atol=1e-7)
     assert_allclose(lms['nose'].lms.points, bunny_nose, atol=1e-7)
     assert_allclose(lms['mouth'].lms.points, bunny_mouth, atol=1e-7)
 
@@ -37,21 +69,21 @@ def test_custom_landmark_logic_bunny():
             'no_nose': os.path.join(mesh.ioinfo.dir, 'bunny_no_nose.json'),
             'full_set': os.path.join(mesh.ioinfo.dir, 'bunny.json')
         }
-    mesh = pio.import_mesh(pio.data_path_to('bunny.obj'), landmark_resolver=f)
+    mesh = mio.import_mesh(mio.data_path_to('bunny.obj'), landmark_resolver=f)
     assert('no_nose' in mesh.landmarks.group_labels)
     lms = mesh.landmarks['no_nose']
-    labels = {'r_eye', 'mouth', 'l_eye'}
+    labels = {'reye', 'mouth', 'leye'}
     assert(len(set(lms.labels) - labels) == 0)
-    assert_allclose(lms['l_eye'].lms.points, bunny_l_eye, atol=1e-7)
-    assert_allclose(lms['r_eye'].lms.points, bunny_r_eye, atol=1e-7)
+    assert_allclose(lms['leye'].lms.points, bunny_leye, atol=1e-7)
+    assert_allclose(lms['reye'].lms.points, bunny_reye, atol=1e-7)
     assert_allclose(lms['mouth'].lms.points, bunny_mouth, atol=1e-7)
 
     assert('full_set' in mesh.landmarks.group_labels)
     lms = mesh.landmarks['full_set']
-    labels = {'r_eye', 'mouth', 'nose', 'l_eye'}
+    labels = {'reye', 'mouth', 'nose', 'leye'}
     assert(len(set(lms.labels) - labels) == 0)
-    assert_allclose(lms['l_eye'].lms.points, bunny_l_eye, atol=1e-7)
-    assert_allclose(lms['r_eye'].lms.points, bunny_r_eye, atol=1e-7)
+    assert_allclose(lms['leye'].lms.points, bunny_leye, atol=1e-7)
+    assert_allclose(lms['reye'].lms.points, bunny_reye, atol=1e-7)
     assert_allclose(lms['nose'].lms.points, bunny_nose, atol=1e-7)
     assert_allclose(lms['mouth'].lms.points, bunny_mouth, atol=1e-7)
 
@@ -59,55 +91,127 @@ def test_custom_landmark_logic_bunny():
 def test_custom_landmark_logic_None_bunny():
     def f(mesh):
         return None
-    mesh = pio.import_mesh(pio.data_path_to('bunny.obj'), landmark_resolver=f)
+    mesh = mio.import_mesh(mio.data_path_to('bunny.obj'), landmark_resolver=f)
     assert(mesh.landmarks.n_groups == 0)
 
 
 def test_json_landmarks_bunny_direct():
-    lms = pio.import_landmark_file(pio.data_path_to('bunny.json'))
+    lms = mio.import_landmark_file(mio.data_path_to('bunny.json'))
     assert(lms.group_label == 'JSON')
-    labels = {'r_eye', 'mouth', 'nose', 'l_eye'}
+    labels = {'reye', 'mouth', 'nose', 'leye'}
     assert(len(labels - set(lms.labels)) == 0)
-    assert_allclose(lms['l_eye'].lms.points, bunny_l_eye, atol=1e-7)
-    assert_allclose(lms['r_eye'].lms.points, bunny_r_eye, atol=1e-7)
+    assert_allclose(lms['leye'].lms.points, bunny_leye, atol=1e-7)
+    assert_allclose(lms['reye'].lms.points, bunny_reye, atol=1e-7)
     assert_allclose(lms['nose'].lms.points, bunny_nose, atol=1e-7)
     assert_allclose(lms['mouth'].lms.points, bunny_mouth, atol=1e-7)
 
 
 def test_breaking_bad_import():
-    img = pio.import_builtin_asset('breakingbad.jpg')
+    img = mio.import_builtin_asset('breakingbad.jpg')
     assert(img.shape == (1080, 1920))
     assert(img.n_channels == 3)
     assert(img.landmarks['PTS'].n_landmarks == 68)
 
 
 def test_takeo_import():
-    img = pio.import_builtin_asset('takeo.ppm')
+    img = mio.import_builtin_asset('takeo.ppm')
     assert(img.shape == (225, 150))
     assert(img.n_channels == 3)
-    assert(img.landmarks.n_groups == 0)
+    assert(img.landmarks['PTS'].n_landmarks == 68)
 
 
 def test_einstein_import():
-    img = pio.import_builtin_asset('einstein.jpg')
+    img = mio.import_builtin_asset('einstein.jpg')
     assert(img.shape == (1024, 817))
     assert(img.n_channels == 1)
     assert(img.landmarks['PTS'].n_landmarks == 68)
 
 
+def test_lenna_import():
+    img = mio.import_builtin_asset('lenna.png')
+    assert(img.shape == (512, 512))
+    assert(img.n_channels == 3)
+    assert(img.landmarks['PTS'].n_landmarks == 68)
+
+
 def test_ioinfo():
     # choose a random asset (all should have it!)
-    img = pio.import_builtin_asset('einstein.jpg')
-    path = pio.data_path_to('einstein.jpg')
+    img = mio.import_builtin_asset('einstein.jpg')
+    path = mio.data_path_to('einstein.jpg')
     assert(img.ioinfo.filepath == path)
     assert(img.ioinfo.filename == 'einstein')
     assert(img.ioinfo.extension == '.jpg')
-    assert(img.ioinfo.dir == pio.data_dir_path())
+    assert(img.ioinfo.dir == mio.data_dir_path())
+
+
+def test_import_image():
+    img_path = os.path.join(mio.data_dir_path(), 'einstein.jpg')
+    mio.import_images(img_path)
+
+
+def test_import_mesh():
+    obj_path = os.path.join(mio.data_dir_path(), 'bunny.obj')
+    mio.import_images(obj_path)
 
 
 def test_import_images():
-    imgs_glob = os.path.join(pio.data_dir_path(), '*')
-    imgs = list(pio.import_images(imgs_glob))
+    imgs_glob = os.path.join(mio.data_dir_path(), '*')
+    imgs = list(mio.import_images(imgs_glob))
     imgs_filenames = set(i.ioinfo.filename for i in imgs)
     exp_imgs_filenames = {'einstein', 'takeo', 'breakingbad', 'lenna'}
     assert(len(exp_imgs_filenames - imgs_filenames) == 0)
+
+
+def test_import_auto():
+    assets_glob = os.path.join(mio.data_dir_path(), '*')
+    assets = list(mio.import_auto(assets_glob))
+    assert(len(assets) == 6)
+
+
+def test_import_auto_max_images():
+    assets_glob = os.path.join(mio.data_dir_path(), '*')
+    assets = list(mio.import_auto(assets_glob,  max_images=2))
+    assert(sum([isinstance(x, TriMesh) for x in assets]) == 2)
+    assert(sum([isinstance(x, Image) for x in assets]) == 2)
+
+
+def test_import_auto_max_meshes():
+    assets_glob = os.path.join(mio.data_dir_path(), '*')
+    assets = list(mio.import_auto(assets_glob, max_meshes=1))
+    assert(sum([isinstance(x, TriMesh) for x in assets]) == 1)
+
+
+def test_ls_builtin_assets():
+    assert(set(mio.ls_builtin_assets()) == {'breakingbad.jpg',
+                                            'breakingbad.pts', 'bunny.json',
+                                            'bunny.obj', 'bunny_no_nose.json',
+                                            'einstein.jpg', 'einstein.pts',
+                                            'james.jpg', 'james.mtl',
+                                            'james.obj', 'lenna.png',
+                                            'lenna.pts', 'takeo.ppm',
+                                            'takeo.pts'})
+
+
+def test_mesh_paths():
+    ls = mio.mesh_paths(os.path.join(mio.data_dir_path(), '*'))
+    assert(len(list(ls)) == 2)
+
+
+def test_image_paths():
+    ls = mio.image_paths(os.path.join(mio.data_dir_path(), '*'))
+    assert(len(list(ls)) == 5)
+
+
+@raises(ValueError)
+def test_import_meshes_wrong_path_raises_value_error():
+    list(mio.import_meshes('asldfjalkgjlaknglkajlekjaltknlaekstjlakj'))
+
+
+@raises(ValueError)
+def test_import_images_wrong_path_raises_value_error():
+    list(mio.import_images('asldfjalkgjlaknglkajlekjaltknlaekstjlakj'))
+
+
+@raises(ValueError)
+def test_import_landmark_files_wrong_path_raises_value_error():
+    list(mio.import_landmark_files('asldfjalkgjlaknglkajlekjaltknlaekstjlakj'))

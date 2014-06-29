@@ -25,7 +25,7 @@ import numpy as np
 from numpy.fft import fftshift, fftn
 import scipy.linalg
 
-from menpo.convolution import log_gabor
+from menpo.math import log_gabor
 from menpo.image import MaskedImage
 
 
@@ -69,7 +69,7 @@ class Residual(object):
         .. math::
              \nabla I \frac{\partial W}{\partial p}
 
-        The input image is vectorised (``N``-pixels) so that masked images can
+        The input image is vectorised (`N`-pixels) so that masked images can
         be handled.
 
         Parameters
@@ -144,18 +144,18 @@ class Residual(object):
         r"""
         Calculates the gradients of the given method.
 
-        If ``forward`` is provided, then the gradients are warped
+        If `forward` is provided, then the gradients are warped
         (as required in the forward additive algorithm)
 
         Parameters
         ----------
         image : :class:`menpo.image.base.Image`
             The image to calculate the gradients for
-        forward : (:class:`template <menpo.image.base.Image>`, :class:`template <menpo.transform.base.AlignableTransform>`, ``warp``), optional
+        forward : (:class:`template <menpo.image.base.Image>`, :class:`template <menpo.transform.base.AlignableTransform>`, `warp`), optional
             A tuple containing the extra weights required for the function
-            ``warp`` (which should be passed as a function handle).
+            `warp` (which should be passed as a function handle).
 
-            Default: ``None``
+            Default: `None`
         """
         if forward:
             # Calculate the gradient over the image
@@ -428,7 +428,7 @@ class GradientImages(Residual):
 
         # reshape gradient
         # second_grad:  n_pixels  x  (n_channels x n_dims)
-        second_grad = second_grad.as_vector(keep_channels=True)
+        second_grad = second_grad.as_vector(keep_channels=True).copy()
 
         # reshape gradient
         # second_grad:  n_pixels  x  n_channels  x  n_dims  x  n_dims
@@ -521,7 +521,7 @@ class GradientCorrelation(Residual):
 
         # reshape gradient
         # second_grad:  n_pixels  x  (n_channels x n_dims)
-        second_grad = second_grad.as_vector(keep_channels=True)
+        second_grad = second_grad.as_vector(keep_channels=True).copy()
 
         # reshape IGOs gradient
         # second_grad:  n_pixels  x  n_channels  x  n_dims  x  n_dims

@@ -6,23 +6,23 @@ from menpo.visualize.base import Viewable, AlignmentViewer2d
 
 class Alignment(Targetable, Viewable):
     r"""
-    Mixin for :class:`Transforms` that have been constructed from an
-    optimisation aligning a source :class:`PointCloud` to a target
-    :class:`PointCloud`.
+    Mix-in for :map:`Transform` that have been constructed from an
+    optimisation aligning a source :map:`PointCloud` to a target
+    :map:`PointCloud`.
 
-    This is naturally an extension of the :class:`Targetable` interface - we
-    just augment Targetable with the concept of a source, and related methods to
-    construct alignments between a source and a target.
+    This is naturally an extension of the :map:`Targetable` interface - we
+    just augment :map:`Targetable` with the concept of a source, and related
+    methods to construct alignments between a source and a target.
 
-    Note: To inherit from Alignment, you have to be a Transform subclass first.
+    Note that to inherit from :map:`Alignment`, you have to be a
+    :map:`Transform` subclass first.
 
     Parameters
     ----------
-
-    source: :class:`PointCloud`
+    source : :map:`PointCloud`
         A PointCloud that the alignment will be based from
 
-    target: :class:`PointCloud`
+    target : :map:`PointCloud`
         A PointCloud that the alignment is targeted towards
 
     """
@@ -47,11 +47,23 @@ class Alignment(Targetable, Viewable):
 
     @property
     def source(self):
+        r"""
+        The source :map:`PointCloud` that is used in the alignment.
+
+        The source is not mutable.
+
+        :type: :map:`PointCloud`
+        """
         return self._source
 
     @property
     def aligned_source(self):
-        # note here we require Alignment
+        r"""
+        The result of applying ``self`` to :attr:`source`
+
+        :type: :map:`PointCloud`
+        """
+        # Note that here we have the dependency that we are a Transform
         return self.apply(self.source)
 
     @property
@@ -66,32 +78,42 @@ class Alignment(Targetable, Viewable):
 
     @property
     def target(self):
+        r"""
+        The current :map:`PointCloud` that this object produces.
+
+        To change the target, use :meth:`set_target`.
+
+        :type: :map:`PointCloud`
+        """
         return self._target
 
     def _target_setter(self, new_target):
         r"""
-        Fulfils the Transformable _target_setter interface for all
+        Fulfils the :map:`Targetable` _target_setter interface for all
         Alignments. This method should purely set the target - we know how to do
-         that for all Alignments.
+        that for all :map:`Alignment` instances.
+
         """
         self._target = new_target
 
     def _new_target_from_state(self):
         r"""
-        Fulfils the Transformable _new_target_from_state interface for all
-        Alignments. This method should purely return the new target to be set -
-        for all Alignments that is just the aligned source
+        Fulfils the :map:`Targetable` :meth:`_new_target_from_state`
+        interface for all Alignments.
+
+        This method should purely return the new target to be set - for all
+        :map:`Alignment` instances this is just the aligned source.
         """
         return self.aligned_source
 
     def _view(self, figure_id=None, new_figure=False, **kwargs):
         r"""
-        View the PureAlignmentTransform. This plots the source points and
-        vectors that represent the shift from source to target.
+        Plots the source points and vectors that represent the shift from
+        source to target.
 
         Parameters
         ----------
-        image : bool, optional
+        image : `bool`, optional
             If ``True`` the vectors are plotted on top of an image
 
             Default: ``False``
