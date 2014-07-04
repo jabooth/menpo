@@ -64,6 +64,7 @@ class MayaviViewer(Renderer):
     def projection_matrix(self):
         r"""Retrieves the projection matrix for this scene.
         """
+        # TODO does this always yield projection matrix (instead of ortho?)
         scene = self.figure.scene
         scene_size = tuple(scene.get_size())
         aspect_ratio = float(scene_size[0]) / float(scene_size[1])

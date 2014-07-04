@@ -121,7 +121,6 @@ class GLRasterizer(CyRasterizerBase):
                 image.landmarks = image_lms
         return images
 
-
     def rasterize_mesh_with_shape_image(self, rasterizable):
         r"""Rasterize the object to an image and generate an interpolated
         3-float image from the shape information on the rasterizable object.

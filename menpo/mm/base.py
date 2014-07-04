@@ -1,4 +1,4 @@
-from menpo.groupalign import GeneralizedProcrustesAnalysis
+from menpo.transform import GeneralizedProcrustesAnalysis
 from menpo.model import PCAModel
 
 from .corresponder import TriMeshCorresponder

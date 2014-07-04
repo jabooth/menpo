@@ -1,6 +1,6 @@
 import numpy as np
 
-from menpo.transform import Translation, Scale, NonUniformScale, Homogeneous
+from menpo.transform import Translation, Scale, NonUniformScale
 from menpo.transform.base import Transform
 
 
@@ -63,7 +63,7 @@ def optimal_cylindrical_unwrap(points):
         A TransformChain which performs the optimal translation and unwrapping.
 
     """
-    from menpo.misctools.circlefit import circle_fit
+    from menpo.math import circle_fit
     from menpo.transform import Translation
     # find the optimum centre to unwrap
     xy = points.points[:, [0, 2]]  # just in the x-z plane
@@ -72,7 +72,7 @@ def optimal_cylindrical_unwrap(points):
     translation = np.array([centre[0], 0, centre[1]])
     centring_transform = Translation(-translation)
     unwrap = CylindricalUnwrap(radius)
-    return centring_transform.compose_before(unwrap)
+    return centring_transform.compose_before(unwrap), radius
 
 
 class ExtractNDims(Transform):
@@ -135,7 +135,7 @@ class AppendNDims(Transform):
         return np.hstack([x, np.ones([x.shape[0], self.n]) * self.value]).copy()
 
 
-def model_to_clip_transform(points, xy_scale=0.9, z_scale=0.1):
+def model_to_clip_transform(points, xy_scale=0.9, z_scale=0.3):
     r"""
     Produces an Affine Transform which centres and scales 3D points to fit
     into the OpenGL clipping space ([-1, 1], [-1, 1], [-1, 1]). This can be
@@ -172,10 +172,15 @@ def model_to_clip_transform(points, xy_scale=0.9, z_scale=0.1):
     centering = Translation(points.centre_of_bounds).pseudoinverse
     # 2. Scale the points to exactly fit the boundaries
     scale = Scale(points.range() / 2.0)
-    # 3. Apply the relaxations requested
-    b_scale = NonUniformScale([xy_scale, xy_scale, z_scale])
+    # 3. Apply the relaxations requested - note the flip in the z axis!!
+    # This is because OpenGL by default evaluates depth as bigger number ==
+    # further away. Thus not only do we need to get to clip space [-1, 1] in
+    # all dims) but we must invert the z axis so depth buffering is correctly
+    # applied. This should be better documented in the future, or we could
+    # consider changing cyrasterize so that it evaluates depth in a cookey way
+    # for OpenGL (but a seemingly much more sensible way for us).
+    b_scale = NonUniformScale([xy_scale, xy_scale, -z_scale])
     return centering.compose_before(scale.pseudoinverse).compose_before(b_scale)
-
 
 
 def clip_to_image_transform(width, height):
