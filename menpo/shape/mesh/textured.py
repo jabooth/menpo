@@ -10,7 +10,7 @@ from menpo.rasterize import Rasterizable
 from .base import TriMesh
 
 
-class TexturedTriMesh(TriMesh, Rasterizable):
+[class TexturedTriMesh(TriMesh, Rasterizable):
     r"""
     Combines a :class:`menpo.shape.mesh.base.TriMesh` with a texture. Also
     encapsulates the texture coordinates required to render the texture on the
@@ -96,6 +96,27 @@ class TexturedTriMesh(TriMesh, Rasterizable):
         # flip axis 0 and axis 1 so indexing is as expected
         tcoords = tcoords[:, ::-1]
         return PointCloud(tcoords)
+
+    def from_vector(self, flattened):
+        r"""
+        Builds a new :class:`TriMesh` given then `flattened` vector.
+        This allows rebuilding pointclouds with the correct number of
+        dimensions from a vector. Note that the trilist will be drawn from
+        self.
+
+        Parameters
+        ----------
+        flattened : (N,) ndarray
+            Vector representing a set of points.
+
+        Returns
+        --------
+        trimesh : :class:`TriMesh`
+            A new trimesh created from the vector with self's trilist.
+        """
+        return TexturedTriMesh(flattened.reshape([-1, self.n_dims]),
+                               self.tcoords.points, self.texture,
+                               trilist=self.trilist)
 
     def tojson(self):
         r"""
