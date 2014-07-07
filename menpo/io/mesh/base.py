@@ -203,16 +203,14 @@ class MeshImporter(Importer):
         meshes = []
         for mesh in self.meshes:
             if textured:
-                new_mesh = TexturedTriMesh(mesh.points.astype(np.float64),
+                new_mesh = TexturedTriMesh(mesh.points,
                                            mesh.tcoords,
                                            import_image(self.texture_path),
-                                           trilist=mesh.trilist,
-                                           copy=False)
+                                           trilist=mesh.trilist)
             elif mesh.colour_per_vertex is not None:
                 new_mesh = ColouredTriMesh(mesh.points,
                                            colours=mesh.colour_per_vertex,
-                                           trilist=mesh.trilist,
-                                           copy=False)
+                                           trilist=mesh.trilist)
             else:
                 new_mesh = TriMesh(mesh.points, trilist=mesh.trilist)
 
