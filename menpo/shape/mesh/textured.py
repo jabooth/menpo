@@ -60,7 +60,8 @@ class TexturedTriMesh(TriMesh, Rasterizable):
             A TexturedTriMesh with the same points, trilist, tcoords, texture
             and landmarks as this one.
         """
-        new_ttm = TexturedTriMesh(self.points, self.tcoords, self.texture,
+        new_ttm = TexturedTriMesh(self.points, self.tcoords.points,
+                                  self.texture,
                                   trilist=self.trilist, copy=True)
         new_ttm.landmarks = self.landmarks
         return new_ttm
