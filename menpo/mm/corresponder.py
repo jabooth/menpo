@@ -57,6 +57,11 @@ def prune_trilist(radius, cy_unwrapped, dead_zone=0.1):
     return t[~bad_tris]
 
 
+def image_to_tcoords(shape, a_0, a_1):
+    return np.hstack([(a_1 * 1.0 / shape[1])[:, None],
+                      ((shape[0] - a_0) * 1.0 /shape[0])[:, None]])
+
+
 class TriMeshCorresponder(object):
     r"""
     Object for bringing landmarked TriMeshes into dense correspondence by
@@ -131,6 +136,7 @@ class TriMeshCorresponder(object):
         # attach the sampling arrays
         self.s_x, self.s_y, self.trilist = sample_points_and_trilist(
             self.mask, self.sampling_rate)
+        self.tcoords = image_to_tcoords(self.mask.shape, self.s_x, self.s_y)
 
     def correspond(self, mesh, group=None, label='all'):
         r"""
@@ -196,8 +202,7 @@ class TriMeshCorresponder(object):
 
     def _extract_textured_trimesh(self, shape_image, rgb_image):
         sampled = shape_image.pixels[self.s_x, self.s_y, :]
-        # TODO generate tcoords and return TexturedTriMesh
-        return TexturedTriMesh(sampled, sampled[:, :2], rgb_image,
+        return TexturedTriMesh(sampled, self.tcoords, rgb_image,
                                trilist=self.trilist)
 
 
