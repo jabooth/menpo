@@ -10,7 +10,7 @@ from menpo.rasterize import Rasterizable
 from .base import TriMesh
 
 
-[class TexturedTriMesh(TriMesh, Rasterizable):
+class TexturedTriMesh(TriMesh, Rasterizable):
     r"""
     Combines a :class:`menpo.shape.mesh.base.TriMesh` with a texture. Also
     encapsulates the texture coordinates required to render the texture on the
