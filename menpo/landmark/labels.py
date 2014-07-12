@@ -754,7 +754,7 @@ def ibug_tongue(landmark_group):
     Raises
     ------
     :class:`menpo.landmark.exceptions.LabellingError`
-        If the given landmark group contains less than 19 points
+        If the given landmark group doesn't contain 19 points
     """
     group_label = 'ibug_tongue'
     n_points = landmark_group.lms.n_points
@@ -772,6 +772,60 @@ def ibug_tongue(landmark_group):
     new_landmark_group['outline'] = np.arange(0, 12)
     new_landmark_group['bisector'] = np.arange(13, 18)
 
+    return new_landmark_group
+
+
+def gosh_60_points(landmark_group):
+    """
+    Apply the GOSH 60 point semantic labels to the landmark group.
+
+
+    Parameters
+    ----------
+    landmark_group: :map:`LandmarkGroup`
+        The landmark group to apply semantic labels to.
+
+    Returns
+    -------
+    landmark_group : :map:`LandmarkGroup`
+        New landmark group with group label 'gosh_60_points'. The pointcloud
+        is also copied.
+
+    Raises
+    ------
+    :map:`LabellingError`
+        If the given landmark group doesn't contain 60 points
+
+
+    """
+    group_label = 'gosh_60_points'
+    n_points = landmark_group.lms.n_points
+
+    if landmark_group.lms.n_points != 60:
+        raise LabellingError("{0} mark-up expects exactly 68 "
+                             "points. However, the given landmark group only "
+                             "has {1} points".format(group_label, n_points))
+
+    new_landmark_group = landmark_group.copy()
+    new_landmark_group['r_jaw'] = np.arange(4)
+    new_landmark_group['l_jaw'] = np.arange(4, 8)
+    new_landmark_group['chin'] = np.arange(8, 11)
+    new_landmark_group['outeroral'] = np.arange(11, 21)
+    new_landmark_group['inneroral'] = np.arange(21, 23)
+    new_landmark_group['outernose'] = np.arange(23, 29)
+    new_landmark_group['r_nostril'] = np.arange(29, 32)
+    new_landmark_group['l_nostril'] = np.arange(32, 35)
+    new_landmark_group['nasion'] = np.arange(35, 36)
+    new_landmark_group['r_eye'] = np.arange(36, 44)
+    new_landmark_group['r_pupil'] = np.arange(44, 45)
+    new_landmark_group['l_eye'] = np.arange(45, 53)
+    new_landmark_group['l_pupil'] = np.arange(53, 54)
+    new_landmark_group['r_supraorbital'] = np.arange(54, 57)
+    new_landmark_group['r_supraorbital'] = np.arange(57, 60)
+    new_landmark_group.group_label = group_label
+
+    # add a nose group with everything in it.
+    new_landmark_group['nose'] = np.arange(23, 35)
     return new_landmark_group
 
 
