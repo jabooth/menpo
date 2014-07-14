@@ -1,7 +1,6 @@
-from menpo.rasterize import GLRasterizer
-from menpo.rasterize import model_to_clip_transform
+from menpo.rasterize import (GLRasterizer, model_to_clip_transform,
+                             dims_3to2, dims_2to3)
 from menpo.transform import (AlignmentSimilarity, ThinPlateSplines,
-                             AppendNDims, ExtractNDims,
                              optimal_cylindrical_unwrap, Transform)
 
 
@@ -36,7 +35,8 @@ class FlattenInterp(Transform):
         self.r_tgt = target
         # Prepare the 2D/3d flattened targets
         self.f_tgt_3d = self.flattener.apply(target)
-        self.f_tgt_2d = ExtractNDims(2).apply(self.f_tgt_3d)
+        self.dims_3to2, self.dims_2to3 = dims_3to2(), dims_2to3()
+        self.f_tgt_2d = self.dims_3to2.apply(self.f_tgt_3d)
 
     def _apply(self, x, group=None, label='all'):
         r"""
@@ -69,7 +69,7 @@ class FlattenInterp(Transform):
         """
         # 2. Flatten the mesh, and warp it to align with the flattened target
         f_3d = self.flattener.apply(x)
-        f_2d = ExtractNDims(2).apply(f_3d)
+        f_2d = self.dims_3to2.apply(f_3d)
 
         # 3. Warp the 2D flatted target to be in dense correspondence
         w_2d = self.interpolator(f_2d.landmarks[group][label].lms,
@@ -77,9 +77,8 @@ class FlattenInterp(Transform):
 
         # 4. Append on the Z dim + set it to what it was in the flattened case
         # TODO we should really re-add the z axis on the landmarks here too
-        w_3d = AppendNDims(1).apply(w_2d)
+        w_3d = self.dims_2to3.apply(w_2d)
         w_3d.points[:, 2] = f_3d.points[:, 2]
-
         return w_3d
 
 
