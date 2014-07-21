@@ -483,7 +483,7 @@ def _import(filepath, extensions_map, keep_importer=False,
 
     # attach ioinfo
     for x in built_objects:
-        x.ioinfo = ioinfo.copy()
+        x.ioinfo = ioinfo
 
     # handle landmarks
     if has_landmarks:
@@ -496,10 +496,8 @@ def _import(filepath, extensions_map, keep_importer=False,
                 lms = _import(lm_path, all_landmark_types, keep_importer=False,
                               has_landmarks=False, asset=asset)
                 for x in built_objects:
-                    try:
+                    if x.n_dims == lms.n_dims:
                         x.landmarks[lms.group_label] = lms
-                    except ValueError:
-                        pass
         else:
             for x in built_objects:
                 lm_paths = landmark_resolver(x)  # use the users fcn to find
@@ -764,9 +762,9 @@ def find_alternative_files(file_type, filepath, extensions_map):
         all_paths = find_extensions_from_basename(filepath)
         base_names = filter_extensions(all_paths, extensions_map)
         if len(base_names) > 1:
-            print "Warning: More than one {0} was found: " \
+            print("Warning: More than one {0} was found: "
                   "{1}. Taking the first by default".format(
-                  file_type, base_names)
+                  file_type, base_names))
         return base_names[0]
     except Exception as e:
         raise ImportError("Failed to find a {0} for {1} from types {2}. "
@@ -865,9 +863,6 @@ class IOInfo(object):
         self.filename = os.path.splitext(os.path.basename(self.filepath))[0]
         self.extension = os.path.splitext(self.filepath)[1]
         self.dir = os.path.dirname(self.filepath)
-
-    def copy(self):
-        return IOInfo(self.filepath)
 
     def __str__(self):
         return 'filename: {}\nextension: {}\ndir: {}\nfilepath: {}'.format(

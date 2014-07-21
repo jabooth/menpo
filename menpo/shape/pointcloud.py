@@ -1,4 +1,5 @@
 import numpy as np
+from warnings import warn
 from scipy.spatial.distance import cdist
 from menpo.visualize import PointCloudViewer
 from menpo.shape.base import Shape
@@ -27,35 +28,15 @@ class PointCloud(Shape):
     """
 
     def __init__(self, points, copy=True):
-
         super(PointCloud, self).__init__()
         if not copy:
-             # Let's check we don't do a copy!
-            points_handle = points
-            self.points = np.require(points, requirements=['C'])
-            if self.points is not points_handle:
-                raise Warning('The copy flag was NOT honoured. '
-                              'A copy HAS been made. Please ensure the data '
-                              'you pass is C-contiguous.')
+            if not points.flags.c_contiguous:
+                warn('The copy flag was NOT honoured. A copy HAS been made. '
+                     'Please ensure the data you pass is C-contiguous.')
+                points = np.array(points, copy=True, order='C')
         else:
-            self.points = np.array(points, copy=True, order='C')
-
-    def copy(self):
-        r"""
-        An efficient copy of this PointCloud.
-
-        Only landmarks and points will be transferred. For a full copy consider
-        using ``deepcopy()``.
-
-        Returns
-        -------
-        pointcloud : :map:`PointCloud`
-            A PointCloud with the same points and landmarks as this one.
-
-        """
-        new_pc = PointCloud(self.points, copy=True)
-        new_pc.landmarks = self.landmarks
-        return new_pc
+            points = np.array(points, copy=True, order='C')
+        self.points = points
 
     @property
     def h_points(self):

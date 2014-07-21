@@ -1,6 +1,6 @@
 from __future__ import division
 import abc
-from copy import deepcopy
+from warnings import warn
 
 import numpy as np
 from scipy.misc import imrotate
@@ -9,11 +9,11 @@ import PIL.Image as PILImage
 from skimage.transform import pyramid_gaussian
 from skimage.transform.pyramids import _smooth
 
-from menpo.base import Vectorizable
-from menpo.landmark import Landmarkable
+from menpo.base import Vectorizable, Copyable
+from menpo.landmark import LandmarkableViewable
 from menpo.transform import (Translation, NonUniformScale, UniformScale,
                              AlignmentUniformScale)
-from menpo.visualize.base import Viewable, ImageViewer
+from menpo.visualize.base import ImageViewer
 from .feature import ImageFeatures, features
 from .interpolation import scipy_interpolation
 
@@ -44,7 +44,7 @@ class ImageBoundaryError(ValueError):
         self.snapped_max = snapped_max
 
 
-class Image(Vectorizable, Landmarkable, Viewable):
+class Image(Vectorizable, LandmarkableViewable):
     r"""
     An n-dimensional image.
 
@@ -83,15 +83,12 @@ class Image(Vectorizable, Landmarkable, Viewable):
     __metaclass__ = abc.ABCMeta
 
     def __init__(self, image_data, copy=True):
-        Landmarkable.__init__(self)
+        super(Image, self).__init__()
         if not copy:
-            # Let's check we don't do a copy!
-            image_data_handle = image_data
-            self.pixels = np.require(image_data, requirements=['C'])
-            if self.pixels is not image_data_handle:
-                raise Warning('The copy flag was NOT honoured. '
-                              'A copy HAS been made. Please ensure the data '
-                              'you pass is C-contiguous.')
+            if not image_data.flags.c_contiguous:
+                image_data = np.array(image_data, copy=True, order='C')
+                warn('The copy flag was NOT honoured. A copy HAS been made. '
+                     'Please ensure the data you pass is C-contiguous.')
         else:
             image_data = np.array(image_data, copy=True, order='C')
             # Degenerate case whereby we can just put the extra axis
@@ -104,9 +101,14 @@ class Image(Vectorizable, Landmarkable, Viewable):
                     "1 channel) or 3D+ (2D+ shape, n_channels) "
                     " - a {}D array "
                     "was provided".format(image_data.ndim))
-            self.pixels = np.require(image_data, requirements=['C'])
-        # add FeatureExtraction functionality
+        self.pixels = image_data
         self.features = ImageFeatures(self)
+
+    def copy(self):
+        # For now, we need to reset the weakref on ImageFeatures on each copy.
+        new = Copyable.copy(self)
+        new.features = ImageFeatures(new)
+        return new
 
     @classmethod
     def blank(cls, shape, n_channels=1, fill=0, dtype=np.float):
@@ -248,26 +250,6 @@ class Image(Vectorizable, Landmarkable, Viewable):
         """
         return np.indices(self.shape).reshape([self.n_dims, -1]).T
 
-    def copy(self):
-        r"""
-        Return a new image with copies of the pixels and landmarks of this
-        image.
-
-        This is an efficient copy method. If you need to copy all the state on
-        the object, consider deepcopy instead.
-
-        Returns
-        -------
-
-        image: :map:`Image`
-            A new image with the same pixels and landmarks as this one, just
-            copied.
-
-        """
-        new_image = Image(self.pixels)
-        new_image.landmarks = self.landmarks
-        return new_image
-
     def _as_vector(self, keep_channels=False):
         r"""
         The vectorized form of this image.
@@ -370,17 +352,15 @@ class Image(Vectorizable, Landmarkable, Viewable):
         the operation, in contrast to MaskedImage, where only the masked
         region is used in from_vector{_inplace}() and as_vector().
         """
-        if copy:
-            vector = vector.copy()
-            self.pixels = np.require(vector.reshape(self.pixels.shape),
-                                     requirements=['C'])
+        image_data = vector.reshape(self.pixels.shape)
+        if not copy:
+            if not image_data.flags.c_contiguous:
+                warn('The copy flag was NOT honoured. A copy HAS been made. '
+                     'Please ensure the data you pass is C-contiguous.')
+                image_data = np.array(image_data, copy=True, order='C')
         else:
-            image_data_handle = vector.reshape(self.pixels.shape)
-            self.pixels = np.require(image_data_handle, requirements=['C'])
-            if self.pixels is not image_data_handle:
-                raise Warning('The copy flag was NOT honoured. '
-                              'A copy HAS been made. Please ensure the vector '
-                              'you pass is C-contiguous.')
+            image_data = np.array(image_data, copy=True, order='C')
+        self.pixels = image_data
 
     def as_histogram(self, keep_channels=True, bins='unique'):
         r"""
@@ -634,7 +614,7 @@ class Image(Vectorizable, Landmarkable, Viewable):
             Raised if `constrain_to_boundary` is `False`, and an attempt is made
             to crop the image in a way that violates the image bounds.
         """
-        cropped_image = deepcopy(self)
+        cropped_image = self.copy()
         return cropped_image.crop_inplace(
             min_indices, max_indices,
             constrain_to_boundary=constrain_to_boundary)
@@ -1208,7 +1188,7 @@ class Image(Vectorizable, Landmarkable, Viewable):
         greyscale_image: :class:`MaskedImage`
             A copy of this image in greyscale.
         """
-        greyscale = deepcopy(self)
+        greyscale = self.copy()
         if mode == 'luminosity':
             if self.n_dims != 2:
                 raise ValueError("The 'luminosity' mode only works on 2D RGB"

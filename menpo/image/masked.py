@@ -1,6 +1,5 @@
 from __future__ import division
-from copy import deepcopy
-
+from warnings import warn
 import numpy as np
 from scipy.ndimage import binary_erosion
 
@@ -173,44 +172,31 @@ class MaskedImage(Image):
 
         """
         if self.mask.all_true:
-            if copy:
+            # reshape the vector into the image again
+            pixels = pixels.reshape(self.shape + (self.n_channels,))
+            if not copy:
+                if not pixels.flags.c_contiguous:
+                    warn('The copy flag was NOT honoured. A copy HAS been '
+                         'made. Copy can only be avoided if MaskedImage has '
+                         'an all_true mask and the pixels provided are '
+                         'C-contiguous.')
+                    pixels = pixels.copy()
+            else:
                 pixels = pixels.copy()
-            # Our mask is all True, so if they don't want a copy
-            # we can respect their wishes
-            self.pixels = pixels.reshape(self.shape + (self.n_channels,))
+            self.pixels = pixels
         else:
             self.pixels[self.mask.mask] = pixels
             # oh dear, couldn't avoid a copy. Did the user try to?
             if not copy:
-                raise Warning('The copy flag was NOT honoured. '
-                              'A copy HAS been made. copy can only be avoided'
-                              ' if MaskedImage has an all_true mask.')
+                warn('The copy flag was NOT honoured. A copy HAS been made. '
+                    'copy can only be avoided if MaskedImage has an all_true'
+                    'mask.')
 
     def __str__(self):
         return ('{} {}D MaskedImage with {} channels. '
                 'Attached mask {:.1%} true'.format(
             self._str_shape, self.n_dims, self.n_channels,
             self.mask.proportion_true))
-
-    def copy(self):
-        r"""
-        Return a new image with copies of the pixels, landmarks, and masks of
-        this image.
-
-        This is an efficient copy method. If you need to copy all the state on
-        the object, consider deepcopy instead.
-
-        Returns
-        -------
-
-        image: :map:`MaskedImage`
-            A new image with the same pixels, mask and landmarks as this one,
-            just copied.
-
-        """
-        new_image = MaskedImage(self.pixels, mask=self.mask)
-        new_image.landmarks = self.landmarks
-        return new_image
 
     def _as_vector(self, keep_channels=False):
         r"""
@@ -593,7 +579,7 @@ class MaskedImage(Image):
         """
         grad_image_pixels = features.gradient(self.pixels)
         grad_image = MaskedImage(grad_image_pixels,
-                                 mask=deepcopy(self.mask))
+                                 mask=self.mask.copy(), copy=False)
 
         if nullify_values_at_mask_boundaries:
             # Erode the edge of the mask in by one pixel
@@ -650,7 +636,7 @@ class MaskedImage(Image):
         pwa = PiecewiseAffine(pc, pc)
         try:
             pwa.apply(self.indices)
-        except TriangleContainmentError, e:
+        except TriangleContainmentError as e:
             self.mask.from_vector_inplace(~e.points_outside_source_domain)
 
     def rescale(self, scale, interpolator='scipy', round='ceil', **kwargs):
