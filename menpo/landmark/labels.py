@@ -814,7 +814,6 @@ def gosh_60_points(landmark_group):
     new_landmark_group['l_pupil'] = np.arange(53, 54)
     new_landmark_group['r_supraorbital'] = np.arange(54, 57)
     new_landmark_group['r_supraorbital'] = np.arange(57, 60)
-    new_landmark_group.group_label = group_label
 
     # add a nose group with everything in it.
     new_landmark_group['nose'] = np.arange(23, 35)
