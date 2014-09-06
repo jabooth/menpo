@@ -568,17 +568,6 @@ class PatchBasedAAMBuilder(AAMBuilder):
         return build_patch_reference_frame(mean_shape, boundary=self.boundary,
                                            patch_shape=self.patch_shape)
 
-    def _mask_image(self, image):
-        r"""
-        Creates the patch-based mask of the given image.
-
-        Parameters
-        ----------
-        image : :map:`MaskedImage`
-            The image to be masked.
-        """
-        image.build_mask_around_landmarks(self.patch_shape, group='source')
-
     def _build_aam(self, shape_models, appearance_models, n_training_images):
         r"""
         Returns a Patch-Based AAM object.
