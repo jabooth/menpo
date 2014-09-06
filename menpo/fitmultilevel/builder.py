@@ -65,15 +65,9 @@ def normalization_wrt_reference_shape(images, group, label,
     # the reference_shape is the mean shape of the images' landmarks
     if verbose:
         print_dynamic('- Computing reference shape')
-    shapes = [i.landmarks[group][label] for i in images]
-    reference_shape = mean_pointcloud(shapes)
-
-    # fix the reference_shape's diagonal length if asked
-    if normalization_diagonal:
-        x, y = reference_shape.range()
-        scale = normalization_diagonal / np.sqrt(x**2 + y**2)
-        Scale(scale, reference_shape.n_dims).apply_inplace(reference_shape)
-
+    reference_shape = calculate_reference_shape([i.landmarks for i in images],
+                                                group, label,
+                                                normalization_diagonal)
     # normalize the scaling of all images wrt the reference_shape size
     normalized_images = []
     for c, i in enumerate(images):
@@ -87,6 +81,23 @@ def normalization_wrt_reference_shape(images, group, label,
     if verbose:
         print_dynamic('- Normalizing images size: Done\n')
     return reference_shape, normalized_images
+
+
+def normalize_wrt_reference_shape(reference_shape, group, label, image):
+    return image.rescale_to_reference_shape(reference_shape, group=group,
+                                            label=label)
+
+
+def calculate_reference_shape(landmarks, group, label,
+                              normalization_diagonal=None):
+    shapes = [lms[group][label] for lms in landmarks]
+    reference_shape = mean_pointcloud(shapes)
+    # fix the reference_shape's diagonal length if asked
+    if normalization_diagonal:
+        x, y = reference_shape.range()
+        scale = normalization_diagonal / np.sqrt(x**2 + y**2)
+        Scale(scale, reference_shape.n_dims).apply_inplace(reference_shape)
+    return reference_shape
 
 
 def build_shape_model(shapes, max_components):
@@ -123,6 +134,17 @@ def build_shape_model(shapes, max_components):
     return shape_model
 
 
+def pyramid_of_warped_feature_images(n_levels, downscale, pyramid_on_features,
+                                     features, group, label, frames,
+                                     transforms, image):
+    # images is a generator that yields each of the pyramid levels in
+    # turn, with features applied as dictated by pyramid_on_features.
+    images = pyramid_of_feature_images(n_levels, downscale,
+                                       pyramid_on_features, features, image)
+    # we want to return a generator that yields these images warped
+    return warp_images_to_frame(group, label, frames, transforms, images)
+
+
 def create_pyramid(images, n_levels, downscale, pyramid_on_features,
                    features, verbose=False):
     r"""
@@ -156,29 +178,43 @@ def create_pyramid(images, n_levels, downscale, pyramid_on_features,
     generator: function
         The generator function of the Gaussian pyramid.
     """
-    if pyramid_on_features:
-        # compute features at highest level
-        feature_images = []
-        for c, i in enumerate(images):
-            if verbose:
-                print_dynamic('- Computing feature space: {}'.format(
-                    progress_bar_str((c + 1.) / len(images),
-                                     show_bar=False)))
-            feature_images.append(features[0](i))
-        if verbose:
-            print_dynamic('- Computing feature space: Done\n')
+    return [pyramid_of_feature_images(i, n_levels, downscale,
+                              pyramid_on_features, features) for i in images]
 
-        # create pyramid on feature_images
-        generator = [i.gaussian_pyramid(n_levels=n_levels,
-                                        downscale=downscale)
-                     for i in feature_images]
+
+def pyramid_of_feature_images(n_levels, downscale, pyramid_on_features,
+                              features, image):
+    if pyramid_on_features:
+        # compute highest level feature
+        feature_image = features[0](image)
+        # create pyramid on the feature image
+        return feature_image.gaussian_pyramid(n_levels=n_levels,
+                                              downscale=downscale)
     else:
-        # create pyramid on intensities images
-        # features will be computed per level
-        generator = [i.gaussian_pyramid(n_levels=n_levels,
-                                        downscale=downscale)
-                     for i in images]
-    return generator
+        # create pyramid on intensities image
+        # feature will be computed per level
+        pyramid_generator = image.gaussian_pyramid(n_levels=n_levels,
+                                                   downscale=downscale)
+        return feature_images(pyramid_generator, features)
+
+
+# adds feature extraction to a generator of images
+def feature_images(images, features):
+    for feature, level in zip(features, images):
+        yield feature(level)
+
+
+# adds warping behavior to a generator of images
+def warp_images_to_frame(group, label, frames, transforms, images):
+    for f_t_i in zip(frames, transforms, images):
+        yield warp_image_to_frame(group, label, *f_t_i)
+
+
+def warp_image_to_frame(group, label, frame, transform, image):
+    # update the transform to point to the new landmarks
+    transform.set_target(image.landmarks[group][label])
+    # warp the image
+    return image.warp_to(frame, transform)
 
 
 class DeformableModelBuilder(object):
