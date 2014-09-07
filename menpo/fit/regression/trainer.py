@@ -6,7 +6,7 @@ from menpo.image import Image
 from menpo.fitmultilevel.functions import (noisy_align, build_sampling_grid,
                                            extract_local_patches_fast,
                                            extract_local_patches)
-from menpo.fitmultilevel.featurefunctions import compute_features, sparse_hog
+from menpo.feature import sparse_hog
 from menpo.fit.fittingresult import (NonParametricFittingResult,
                                      SemiParametricFittingResult,
                                      ParametricFittingResult)
@@ -243,39 +243,13 @@ class NonParametricRegressorTrainer(RegressorTrainer):
         Examples of such closures can be found in
         :ref:`regression_functions`
 
-    regression_features : ``None`` or `string` or `function`, optional
+    regression_features : `function`, optional
         The features that are used during the regression.
 
-        If ``None``, no feature representation will be computed from the
-        original image.
-
-        If `string` or `function`, the feature representation will be computed
-        in the following way:
-        
-            If `string`, the feature representation will be extracted by
-            executing::
-
-                feature_image = getattr(image.features, feature_type)()
-
-            For this to work properly feature_type needs to be one of
-            Menpo's standard image feature methods. Note that, in this case,
-            the feature computation will be carried out using its default
-            options.
-
-            Non-default feature options and new experimental feature can be
-            used by defining a closure. In this case, the closure must define a
-            function that receives as an input an image and returns a
-            particular feature representation of that image. For example::
-
-                def igo_double_from_std_normalized_intensities(image)
-                    image = deepcopy(image)
-                    image.normalize_std_inplace()
-                    return image.feature_type.igo(double_angles=True)
-
-            See :map:`ImageFeatures` for details more details on
-            Menpo's standard image features and feature options.
-            See :ref:`feature_functions` for non standard
-            features definitions.
+        See `menpo.features` for details more details on
+        Menpo's standard image features and feature options.
+        See :ref:`feature_functions` for non standard
+        features definitions.
 
     patch_shape : tuple, optional
         The shape of the patches that will be extracted.
@@ -306,8 +280,7 @@ class NonParametricRegressorTrainer(RegressorTrainer):
     def _set_up(self):
         # work out feature length per patch
         patch_img = Image.blank(self.patch_shape, fill=0)
-        self._feature_patch_length = compute_features(
-            patch_img, self.regression_features).n_parameters
+        self._feature_patch_length = self.regression_features(patch_img).n_parameters
 
     @property
     def algorithm(self):
@@ -355,8 +328,7 @@ class NonParametricRegressorTrainer(RegressorTrainer):
             # build patch image
             patch_img = Image(patch, copy=False)
             # compute features
-            features[j, ...] = compute_features(
-                patch_img, self.regression_features).as_vector()
+            features[j, ...] = self.regression_features(patch_img).as_vector()
 
         return np.hstack((features.ravel(), 1))
 
@@ -399,39 +371,13 @@ class SemiParametricRegressorTrainer(NonParametricRegressorTrainer):
         Examples of such closures can be found in
         :ref:`regression_functions`
 
-    regression_features : ``None`` or `string` or `function`, optional
+    regression_features : `function`, optional
         The features that are used during the regression.
 
-        If ``None``, no feature representation will be computed from the
-        original image.
-
-        If `string` or `function`, the feature representation will be computed
-        in the following way:
-
-            If `string`, the feature representation will be extracted by
-            executing::
-
-                feature_image = getattr(image.features, feature_type)()
-
-            For this to work properly feature_type needs to be one of
-            Menpo's standard image feature methods. Note that, in this case,
-            the feature computation will be carried out using its default
-            options.
-
-            Non-default feature options and new experimental feature can be
-            used by defining a closure. In this case, the closure must define a
-            function that receives as an input an image and returns a
-            particular feature representation of that image. For example::
-
-                def igo_double_from_std_normalized_intensities(image)
-                    image = deepcopy(image)
-                    image.normalize_std_inplace()
-                    return image.feature_type.igo(double_angles=True)
-
-            See :map:`ImageFeatures` for details more details on
-            Menpo's standard image features and feature options.
-            See :ref:`feature_functions` for non standard
-            features definitions.
+        See `menpo.features` for details more details on
+        Menpo's standard image features and feature options.
+        See :ref:`feature_functions` for non standard
+        features definitions.
 
     patch_shape : tuple, optional
         The shape of the patches that will be extracted.
@@ -667,7 +613,7 @@ class SemiParametricClassifierBasedRegressorTrainer(
 
     Parameters
     ----------
-    classifiers : list of :ref:`classifier_functions`
+    classifiers : list of :map:`classifiers`
         List of classifiers.
 
     transform : :map:`Affine`
