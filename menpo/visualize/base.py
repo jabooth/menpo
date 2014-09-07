@@ -1,6 +1,6 @@
 # This has to go above the default importers to prevent cyclical importing
 import abc
-
+import numpy as np
 from collections import Iterable
 
 
@@ -188,9 +188,11 @@ from menpo.visualize.viewmatplotlib import (
     MatplotlibLandmarkViewer2dImage, MatplotlibTriMeshViewer2d,
     MatplotlibAlignmentViewer2d, MatplotlibGraphPlotter,
     MatplotlibMultiImageViewer2d, MatplotlibMultiImageSubplotsViewer2d,
-    MatplotlibFittingViewer2d, MatplotlibFittingSubplotsViewer2d)
+    MatplotlibFittingViewer2d, MatplotlibFittingSubplotsViewer2d,
+    MatplotlibPointGraphViewer2d)
 
 # Default importer types
+PointGraphViewer2d = MatplotlibPointGraphViewer2d
 PointCloudViewer2d = MatplotlibPointCloudViewer2d
 PointCloudViewer3d = MayaviPointCloudViewer3d
 TriMeshViewer2d = MatplotlibTriMeshViewer2d
@@ -339,6 +341,58 @@ class PointCloudViewer(object):
                              "currently supported")
 
 
+class PointGraphViewer(object):
+    r"""
+    Base PointGraph viewer that abstracts away dimensionality.
+
+    Parameters
+    ----------
+    figure_id : object
+        A figure id. Could be any valid object that identifies
+        a figure in a given framework (string, int, etc)
+    new_figure : bool
+        Whether the rendering engine should create a new figure.
+    points : (N, D) ndarray
+        The points to render.
+    adjacency_array : (N, 2) ndarray
+        The list of edges to create lines from.
+    """
+
+    def __init__(self, figure_id, new_figure, points, adjacency_list):
+        self.figure_id = figure_id
+        self.new_figure = new_figure
+        self.points = points
+        self.adjacency_list = adjacency_list
+
+    def render(self, **kwargs):
+        r"""
+        Select the correct type of pointgraph viewer for the given
+        pointgraph dimensionality.
+
+        Parameters
+        ----------
+        kwargs : dict
+            Passed through to pointgraph viewer.
+
+        Returns
+        -------
+        viewer : :class:`Renderer`
+            The rendering object.
+
+        Raises
+        ------
+        DimensionalityError
+            Only 2D viewers are supported.
+        """
+        if self.points.shape[1] == 2:
+            return PointGraphViewer2d(self.figure_id, self.new_figure,
+                                      self.points,
+                                      self.adjacency_list).render(**kwargs)
+        else:
+            raise ValueError("Only 2D pointgraphs are "
+                             "currently supported")
+
+
 class ImageViewer(object):
     r"""
     Base Image viewer that abstracts away dimensionality. It can visualize
@@ -415,8 +469,8 @@ class ImageViewer(object):
     def _masked_pixels(self, pixels, mask):
         r"""
         Return the masked pixels using a given boolean mask. In order to make
-        sure that the non-masked pixels are visualized in black, their value
-        is set to the minimum between min(pixels) and 0.
+        sure that the non-masked pixels are visualized in white, their value
+        is set to the maximum of pixels.
 
         Parameters
         ----------
@@ -424,11 +478,11 @@ class ImageViewer(object):
             The image's pixels to render.
         mask: (N, D) ndarray
             A boolean mask to be applied to the image. All points outside the
-            mask are set to 0. If mask is None, then the initial pixels are
-            returned.
+            mask are set to the image max.
+            If mask is None, then the initial pixels are returned.
         """
         if mask is not None:
-            pixels[~mask] = min(pixels.min(), 0)
+            pixels[~mask] = np.nanmax(pixels) + 1
         return pixels
 
     def render(self, **kwargs):
