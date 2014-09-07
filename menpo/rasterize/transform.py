@@ -1,7 +1,8 @@
+from functools import reduce
 import numpy as np
 
-from menpo.transform import Translation, Scale, NonUniformScale
 from menpo.transform.base import Transform
+from menpo.transform import Homogeneous, Translation, Scale, NonUniformScale
 
 
 class CylindricalUnwrap(Transform):
@@ -75,80 +76,58 @@ def optimal_cylindrical_unwrap(points):
     return centring_transform.compose_before(unwrap), radius
 
 
-class ExtractNDims(Transform):
+def dims_3to2():
     r"""
-    Extracts out the first n dimensions of a shape.
+
+    Returns
+     ------
+    :map`Homogeneous`
+        :map`Homogeneous` that strips off the 3D axis of a 3D shape
+        leaving just the first two axes.
+
+    """
+    return Homogeneous(np.array([[1, 0, 0, 0],
+                                 [0, 1, 0, 0],
+                                 [0, 0, 0, 1]]))
+
+
+def dims_2to3(x=0):
+    r"""
+    Return a :map`Homogeneous` that adds on a 3rd axis to a 2D shape.
 
     Parameters
     ----------
+    x : `float`, optional
+        The value that will be assigned to the new third dimension
 
-    n : int
-        The number of dimensions to extract
+    Returns
+     ------
+    :map`Homogeneous`
+        :map`Homogeneous` that adds on a 3rd axis to a 2D shape.
+
     """
-    def __init__(self, n):
-        self.n = n
-
-    @property
-    def n_dims(self):
-        # can operate on any dimensional shape
-        return None
-
-    @property
-    def n_dims_output(self):
-        # output is just n
-        return self.n
-
-    def _apply(self, x, **kwargs):
-        return x[:, :self.n].copy()
-
-
-class AppendNDims(Transform):
-    r"""
-    Adds n dims to a shape
-
-    Parameters
-    ----------
-
-    n : int
-        The number of dimensions to add
-
-    value: float, optional
-        The value that the extra dims should be given
-
-        Default: 0
-    """
-    def __init__(self, n, value=0):
-        self.n = n
-        self.value = value
-
-    @property
-    def n_dims(self):
-        # can operate on any dimensional shape
-        return None
-
-    @property
-    def n_dims_output(self):
-        # output is unknown (we don't in general know the input!)
-        return None
-
-    def _apply(self, x, **kwargs):
-        return np.hstack([x, np.ones([x.shape[0], self.n]) * self.value]).copy()
+    return Homogeneous(np.array([[1, 0, 0],
+                                 [0, 1, 0],
+                                 [0, 0, x],
+                                 [0, 0, 1]]))
 
 
 def model_to_clip_transform(points, xy_scale=0.9, z_scale=0.3):
     r"""
     Produces an Affine Transform which centres and scales 3D points to fit
-    into the OpenGL clipping space ([-1, 1], [-1, 1], [-1, 1]). This can be
+    into the OpenGL clipping space ([-1, 1], [-1, 1], [1, 1-]). This can be
     used to construct an appropriate projection matrix for use in an
-    orthographic Rasterizer.
+    orthographic Rasterizer. Note that the z-axis is flipped as is default in
+    OpenGL - as a result this transform converts the right handed coordinate
+    input into a left hand one.
 
     Parameters
     ----------
 
-    points: :class:`PointCloud`
+    points: :map:`PointCloud`
         The points that should be adjusted.
 
-    xy_scale: float 0-1, optional
+    xy_scale: `float` 0-1, optional
         Amount by which the boundary is relaxed so the points are not
         right against the edge. A value of 1 means the extremities of the
         point cloud will be mapped onto [-1, 1] [-1, 1] exactly (no boarder)
@@ -160,27 +139,25 @@ def model_to_clip_transform(points, xy_scale=0.9, z_scale=0.3):
     z_scale: float 0-1, optional
         Scale factor by which the z-dimension is squeezed. A value of 1
         means the z-range of the points will be mapped to exactly fit in
-        [-1, 1]. A scale of 0.1 means the z-range is compressed to fit in the
-        range [-0.1, 0.1].
+        [1, -1]. A scale of 0.1 means the z-range is compressed to fit in the
+        range [0.1, -0.1].
 
     Returns
     -------
-    :class:`Affine`
+    :map:`Affine`
         The affine transform that creates this mapping
     """
     # 1. Centre the points on the origin
-    centering = Translation(points.centre_of_bounds).pseudoinverse
+    center = Translation(points.centre_of_bounds).pseudoinverse
     # 2. Scale the points to exactly fit the boundaries
     scale = Scale(points.range() / 2.0)
     # 3. Apply the relaxations requested - note the flip in the z axis!!
     # This is because OpenGL by default evaluates depth as bigger number ==
     # further away. Thus not only do we need to get to clip space [-1, 1] in
     # all dims) but we must invert the z axis so depth buffering is correctly
-    # applied. This should be better documented in the future, or we could
-    # consider changing cyrasterize so that it evaluates depth in a cookey way
-    # for OpenGL (but a seemingly much more sensible way for us).
+    # applied.
     b_scale = NonUniformScale([xy_scale, xy_scale, -z_scale])
-    return centering.compose_before(scale.pseudoinverse).compose_before(b_scale)
+    return center.compose_before(scale.pseudoinverse).compose_before(b_scale)
 
 
 def clip_to_image_transform(width, height):
@@ -205,11 +182,8 @@ def clip_to_image_transform(width, height):
         A homogeneous transform that moves clip space coordinates into image
         space.
     """
-    from menpo.transform import Homogeneous, Translation, Scale
     # 1. Remove the z axis from the clip space
-    rem_z = Homogeneous(np.array([[1, 0, 0, 0],
-                                  [0, 1, 0, 0],
-                                  [0, 0, 0, 1]]))
+    rem_z = dims_3to2()
     # 2. invert the y direction (up becomes down)
     invert_y = Scale([1, -1])
     # 3. [-1, 1] [-1, 1] -> [0, 2] [0, 2]

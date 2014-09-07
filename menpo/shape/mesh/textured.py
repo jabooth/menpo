@@ -1,11 +1,9 @@
-import copy
 import numpy as np
 
-from menpo.rasterize.base import TextureRasterInfo
 from menpo.shape import PointCloud
-from menpo.visualize import TexturedTriMeshViewer3d
+from menpo.rasterize import Rasterizable, TextureRasterInfo
 from menpo.transform import Scale
-from menpo.rasterize import Rasterizable
+from menpo.visualize import TexturedTriMeshViewer3d
 
 from .base import TriMesh
 
@@ -47,24 +45,14 @@ class TexturedTriMesh(TriMesh, Rasterizable):
         else:
             self.texture = texture.copy()
 
-    def copy(self):
-        r"""
-        An efficient copy of this TexturedTriMesh.
+    @property
+    def _rasterize_type_texture(self):
+        return True  # TexturedTriMesh can specify texture rendering params
 
-        Only landmarks and points will be transferred. For a full copy consider
-        using `deepcopy()`.
-
-        Returns
-        -------
-        texturedtrimesh: :map:`TexturedTriMesh`
-            A TexturedTriMesh with the same points, trilist, tcoords, texture
-            and landmarks as this one.
-        """
-        new_ttm = TexturedTriMesh(self.points, self.tcoords.points,
-                                  self.texture,
-                                  trilist=self.trilist, copy=True)
-        new_ttm.landmarks = self.landmarks
-        return new_ttm
+    def _rasterize_generate_textured_mesh(self):
+        return TextureRasterInfo(self.points, self.trilist,
+                                 self.tcoords.points,
+                                 self.texture.pixels)
 
     def tcoords_pixel_scaled(self):
         r"""
@@ -100,10 +88,8 @@ class TexturedTriMesh(TriMesh, Rasterizable):
 
     def from_vector(self, flattened):
         r"""
-        Builds a new :class:`TriMesh` given then `flattened` vector.
-        This allows rebuilding pointclouds with the correct number of
-        dimensions from a vector. Note that the trilist will be drawn from
-        self.
+        Builds a new :class:`TexturedTriMesh` given then `flattened` vector.
+        Note that the trilist, texture, and tcoords will be drawn from self.
 
         Parameters
         ----------
@@ -177,12 +163,3 @@ class TexturedTriMesh(TriMesh, Rasterizable):
     def __str__(self):
         return '{}\ntexture_shape: {}, n_texture_channels: {}'.format(
             TriMesh.__str__(self), self.texture.shape, self.texture.n_channels)
-
-    @property
-    def _rasterize_type_texture(self):
-        return True  # TexturedTriMesh can specify texture rendering params
-
-    def _rasterize_generate_textured_mesh(self):
-        return TextureRasterInfo(self.points, self.trilist,
-                                 self.tcoords.points,
-                                 self.texture.pixels)

@@ -5,7 +5,7 @@ from menpo.shape import TriMesh, TexturedTriMesh
 from menpo.image import MaskedImage, BooleanImage
 from menpo.rasterize import GLRasterizer
 from menpo.transform import AlignmentSimilarity, ThinPlateSplines
-from menpo.rasterize.transform import (ExtractNDims, AppendNDims,
+from menpo.rasterize.transform import (dims_3to2, dims_2to3,
                                        model_to_clip_transform,
                                        optimal_cylindrical_unwrap)
 
@@ -246,7 +246,7 @@ class FlattenInterpolator(object):
 
         # Prepare the flattened target in 2D and 3D
         self.f_target_3d = self.flattener.apply(self.target)
-        self.f_target_2d = ExtractNDims(2).apply(self.f_target_3d)
+        self.f_target_2d = dims_3to2().apply(self.f_target_3d)
 
     def __call__(self, mesh, group=None, label='all'):
         r"""
@@ -281,7 +281,7 @@ class FlattenInterpolator(object):
 
         # 2. Flatten the mesh, and warp it to align with the flattened target
         f_3d = self.flattener.apply(rigid_aligned_mesh)
-        f_2d = ExtractNDims(2).apply(f_3d)
+        f_2d = dims_3to2().apply(f_3d)
 
         # 3. Warp the 2D flatted target to be in dense correspondence
         tps_transform = self.interpolator(f_2d.landmarks[group][label].lms,
@@ -289,7 +289,7 @@ class FlattenInterpolator(object):
         w_2d = tps_transform.apply(f_2d)
 
         # 4. Append on the Z dim + set it to what it was in the flattened case
-        w_3d = AppendNDims(1).apply(w_2d)
+        w_3d = dims_2to3().apply(w_2d)
         w_3d.points[:, 2] = f_3d.points[:, 2]
         # 5. Break any connections at the back of the cylinder
         w_3d.trilist = prune_trilist(self.radius, w_3d,

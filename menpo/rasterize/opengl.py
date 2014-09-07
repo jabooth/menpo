@@ -5,10 +5,11 @@ from menpo.image import MaskedImage
 from menpo.transform import Homogeneous
 
 from .base import TextureRasterInfo
-from .transform import ExtractNDims, clip_to_image_transform
+from .transform import clip_to_image_transform
 
 
 # Subclass the CyRasterizerBase class to add Menpo-specific features
+# noinspection PyProtectedMember
 class GLRasterizer(CyRasterizerBase):
 
     @property
@@ -53,7 +54,8 @@ class GLRasterizer(CyRasterizerBase):
 
     def rasterize_mesh_with_f3v_interpolant(self, rasterizable,
                                             per_vertex_f3v=None):
-        r"""Rasterize the object to an image and generate an interpolated
+        r"""
+        Rasterize the object to an image and generate an interpolated
         3-float image from a per vertex float 3 vector.
 
         If no per_vertex_f3v is provided, the model's shape is used (making
@@ -99,7 +101,7 @@ class GLRasterizer(CyRasterizerBase):
             fake_tcoords = np.random.randn(colour_r.points.shape[0], 2)
             fake_texture = np.zeros([2, 2, 3])
             r = TextureRasterInfo(colour_r.points, colour_r.trilist,
-                              fake_tcoords, fake_texture)
+                                  fake_tcoords, fake_texture)
 
             # The RGB image is going to be broken due to the fake texture
             # information we passed in
