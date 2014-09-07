@@ -6,15 +6,14 @@ import numpy as np
 from scipy.misc import imrotate
 import scipy.linalg
 import PIL.Image as PILImage
-from skimage.transform import pyramid_gaussian
-from skimage.transform.pyramids import _smooth
+pyramid_gaussian = None  # expensive, from skimage.transform
+_smooth = None  # expensive, from skimage.transform.pyramids
 
 from menpo.base import Vectorizable
 from menpo.landmark import LandmarkableViewable
 from menpo.transform import (Translation, NonUniformScale, UniformScale,
                              AlignmentUniformScale)
 from menpo.visualize.base import ImageViewer
-from .feature import ImageFeatures, features
 from .interpolation import scipy_interpolation
 
 
@@ -60,17 +59,13 @@ class Image(Vectorizable, LandmarkableViewable):
     image_data : ``(M, N ..., Q, C)`` `ndarray`
         Array representing the image pixels, with the last axis being
         channels.
+
     copy : `bool`, optional
         If ``False``, the ``image_data`` will not be copied on assignment.
         Note that this will miss out on additional checks. Further note that we
         still demand that the array is C-contiguous - if it isn't, a copy will
         be generated anyway.
         In general, this should only be used if you know what you are doing.
-
-    Attributes
-    ----------
-    features : :map:`ImageFeatures`
-        Gives access to all the feature types that we support.
 
     Raises
     ------
@@ -102,7 +97,6 @@ class Image(Vectorizable, LandmarkableViewable):
                     " - a {}D array "
                     "was provided".format(image_data.ndim))
         self.pixels = image_data
-        self.features = ImageFeatures(self)
 
     @classmethod
     def blank(cls, shape, n_channels=1, fill=0, dtype=np.float):
@@ -243,26 +237,6 @@ class Image(Vectorizable, LandmarkableViewable):
 
         """
         return np.indices(self.shape).reshape([self.n_dims, -1]).T
-
-    def copy(self):
-        r"""
-        Return a new image with copies of the pixels and landmarks of this
-        image.
-
-        This is an efficient copy method. If you need to copy all the state on
-        the object, consider deepcopy instead.
-
-        Returns
-        -------
-
-        image: :map:`Image`
-            A new image with the same pixels and landmarks as this one, just
-            copied.
-
-        """
-        new_image = Image(self.pixels)
-        new_image.landmarks = self.landmarks
-        return new_image
 
     def _as_vector(self, keep_channels=False):
         r"""
@@ -521,7 +495,8 @@ class Image(Vectorizable, LandmarkableViewable):
             gradient of a 2D, single channel image, will have length `2`.
             The length of a 2D, 3-channel image, will have length `6`.
         """
-        grad_image_pixels = features.gradient(self.pixels)
+        from menpo.feature import gradient
+        grad_image_pixels = gradient(self.pixels)
         grad_image = Image(grad_image_pixels, copy=False)
         grad_image.landmarks = self.landmarks
         return grad_image
@@ -633,7 +608,7 @@ class Image(Vectorizable, LandmarkableViewable):
             min_indices, max_indices,
             constrain_to_boundary=constrain_to_boundary)
 
-    def crop_to_landmarks_inplace(self, group=None, label='all', boundary=0,
+    def crop_to_landmarks_inplace(self, group=None, label=None, boundary=0,
                                   constrain_to_boundary=True):
         r"""
         Crop this image to be bounded around a set of landmarks with an
@@ -646,18 +621,15 @@ class Image(Vectorizable, LandmarkableViewable):
             and if there is only one set of landmarks, this set will be used.
 
             Default: `None`
-
         label : string, Optional
             The label of of the landmark manager that you wish to use. If
-            'all' all landmarks in the group are used.
+            `None` all landmarks in the group are used.
 
-            Default: 'all'
-
+            Default: `None`
         boundary : int, Optional
             An extra padding to be added all around the landmarks bounds.
 
             Default: `0`
-
         constrain_to_boundary : boolean, optional
             If `True` the crop will be snapped to not go beyond this images
             boundary. If `False`, an :map`ImageBoundaryError` will be raised if
@@ -676,13 +648,13 @@ class Image(Vectorizable, LandmarkableViewable):
             Raised if `constrain_to_boundary` is `False`, and an attempt is made
             to crop the image in a way that violates the image bounds.
         """
-        pc = self.landmarks[group][label].lms
+        pc = self.landmarks[group][label]
         min_indices, max_indices = pc.bounds(boundary=boundary)
         return self.crop_inplace(min_indices, max_indices,
                                  constrain_to_boundary=constrain_to_boundary)
 
     def crop_to_landmarks_proportion_inplace(self, boundary_proportion,
-                                             group=None, label='all',
+                                             group=None, label=None,
                                              minimum=True,
                                              constrain_to_boundary=True):
         r"""
@@ -703,9 +675,9 @@ class Image(Vectorizable, LandmarkableViewable):
             Default: `None`
         label : string, Optional
             The label of of the landmark manager that you wish to use. If
-            'all' all landmarks in the group are used.
+            `None` all landmarks in the group are used.
 
-            Default: 'all'
+            Default: `None`
         minimum : bool, Optional
             If `True` the specified proportion is relative to the minimum
             value of the landmarks' per-dimension range; if `False` w.r.t. the
@@ -731,7 +703,7 @@ class Image(Vectorizable, LandmarkableViewable):
             Raised if `constrain_to_boundary` is `False`, and an attempt is made
             to crop the image in a way that violates the image bounds.
         """
-        pc = self.landmarks[group][label].lms
+        pc = self.landmarks[group][label]
         if minimum:
             boundary = boundary_proportion * np.min(pc.range())
         else:
@@ -924,7 +896,7 @@ class Image(Vectorizable, LandmarkableViewable):
                             interpolator=interpolator, **kwargs)
 
     def rescale_to_reference_shape(self, reference_shape, group=None,
-                                   label='all', interpolator='scipy',
+                                   label=None, interpolator='scipy',
                                    round='ceil', **kwargs):
         r"""
         Return a copy of this image, rescaled so that the scale of a
@@ -940,12 +912,12 @@ class Image(Vectorizable, LandmarkableViewable):
             The key of the landmark set that should be used. If None,
             and if there is only one set of landmarks, this set will be used.
 
-            Default: None
+            Default: `None`
         label: string, Optional
             The label of of the landmark manager that you wish to use. If
-            'all' all landmarks in the group are used.
+            `None` all landmarks in the group are used.
 
-            Default: 'all'
+            Default: `None`
         interpolator : 'scipy' or 'c', optional
             The interpolator that should be used to perform the warp.
 
@@ -962,13 +934,13 @@ class Image(Vectorizable, LandmarkableViewable):
         rescaled_image : type(self)
             A copy of this image, rescaled.
         """
-        pc = self.landmarks[group][label].lms
+        pc = self.landmarks[group][label]
         scale = AlignmentUniformScale(pc, reference_shape).as_vector().copy()
         return self.rescale(scale, interpolator=interpolator,
                             round=round, **kwargs)
 
     def rescale_landmarks_to_diagonal_range(self, diagonal_range, group=None,
-                                            label='all', interpolator='scipy',
+                                            label=None, interpolator='scipy',
                                             round='ceil', **kwargs):
         r"""
         Return a copy of this image, rescaled so that the diagonal_range of the
@@ -987,9 +959,9 @@ class Image(Vectorizable, LandmarkableViewable):
             Default: None
         label: string, Optional
             The label of of the landmark manager that you wish to use. If
-            'all' all landmarks in the group are used.
+            `None` all landmarks in the group are used.
 
-            Default: 'all'
+            Default: `None`
         interpolator : 'scipy', optional
             The interpolator that should be used to perform the warp.
 
@@ -1006,7 +978,7 @@ class Image(Vectorizable, LandmarkableViewable):
         rescaled_image : type(self)
             A copy of this image, rescaled.
         """
-        x, y = self.landmarks[group][label].lms.range()
+        x, y = self.landmarks[group][label].range()
         scale = diagonal_range / np.sqrt(x ** 2 + y ** 2)
         return self.rescale(scale, interpolator=interpolator,
                             round=round, **kwargs)
@@ -1102,6 +1074,9 @@ class Image(Vectorizable, LandmarkableViewable):
         image_pyramid:
             Generator yielding pyramid layers as menpo image objects.
         """
+        global pyramid_gaussian
+        if pyramid_gaussian is None:
+            from skimage.transform import pyramid_gaussian  # expensive
         max_layer = n_levels - 1
         pyramid = pyramid_gaussian(self.pixels, max_layer=max_layer,
                                    downscale=downscale, sigma=sigma,
@@ -1158,6 +1133,9 @@ class Image(Vectorizable, LandmarkableViewable):
         image_pyramid:
             Generator yielding pyramid layers as menpo image objects.
         """
+        global _smooth
+        if _smooth is None:
+            from skimage.transform.pyramids import _smooth  # expensive
         for j in range(n_levels):
             if j == 0:
                 yield self
@@ -1252,7 +1230,9 @@ class Image(Vectorizable, LandmarkableViewable):
             raise ValueError('Can only convert greyscale or RGB 2D images. '
                              'Received a {} channel {}D image.'.format(
                 self.n_channels, self.ndims))
-        return PILImage.fromarray((self.pixels * 255).astype(np.uint8))
+        # Slice off the channel for greyscale images
+        pixels = self.pixels[..., 0] if self.n_channels == 1 else self.pixels
+        return PILImage.fromarray((pixels * 255).astype(np.uint8))
 
     def __str__(self):
         return ('{} {}D Image with {} channels'.format(
@@ -1287,19 +1267,19 @@ class Image(Vectorizable, LandmarkableViewable):
                 self.landmarks[l_group] = l
 
 
-def _create_feature_glyph(features, vbs):
+def _create_feature_glyph(feature, vbs):
     r"""
     Create glyph of feature pixels.
 
     Parameters
     ----------
-    feature_type : (N, D) ndarray
+    feature : (N, D) ndarray
         The feature pixels to use.
     vbs: int
         Defines the size of each block with vectors of the glyph image.
     """
     # vbs = Vector block size
-    num_bins = features.shape[2]
+    num_bins = feature.shape[2]
     # construct a "glyph" for each orientation
     block_image_temp = np.zeros((vbs, vbs))
     # Create a vertical line of ones, to be the first vector
@@ -1314,9 +1294,8 @@ def _create_feature_glyph(features, vbs):
         block_im[:, :, i] = imrotate(block_image_temp, -i * vbs)
 
     # make pictures of positive feature_data by adding up weighted glyphs
-    features[features < 0] = 0
+    feature[feature < 0] = 0
     glyph_im = np.sum(block_im[None, None, :, :, :] *
-                      features[:, :, None, None, :], axis=-1)
+                      feature[:, :, None, None, :], axis=-1)
     glyph_im = np.bmat(glyph_im.tolist())
     return glyph_im
-

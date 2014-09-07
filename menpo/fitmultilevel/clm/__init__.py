@@ -1,3 +1,3 @@
-from .base import GradientDescentCLMFitter
 from .builder import CLMBuilder
-from .classifierfunctions import linear_svm_lr
+from .fitter import GradientDescentCLMFitter
+from .classifier import linear_svm_lr

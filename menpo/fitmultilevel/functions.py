@@ -9,7 +9,7 @@ from menpo.transform import Similarity, AlignmentSimilarity
 def build_sampling_grid(patch_shape):
     r"""
     """
-    patch_shape= np.array(patch_shape)
+    patch_shape = np.array(patch_shape)
     patch_half_shape = np.require(np.round(patch_shape / 2), dtype=int)
     start = -patch_half_shape
     end = patch_half_shape + 1
@@ -140,24 +140,6 @@ def extract_local_patches_fast(image, centres, patch_shape, out=None):
     return patches
 
 
-def mean_pointcloud(pointclouds):
-    r"""
-    Compute the mean of a list of point cloud objects
-
-    Parameters
-    ----------
-    pointclouds: list of :class:`menpo.shape.PointCloud`
-        List of point cloud objects from which we want to
-        compute the mean.
-
-    Returns
-    -------
-    mean_pointcloud: class:`menpo.shape.PointCloud`
-        The mean point cloud.
-    """
-    return PointCloud(np.mean([pc.points for pc in pointclouds], axis=0))
-
-
 # TODO: Should this be a method on Similarity? AlignableTransforms?
 def noisy_align(source, target, noise_std=0.04, rotation=False):
     r"""
@@ -253,3 +235,12 @@ def _compute_me_norm(target, ground_truth):
     normalizer = np.mean(np.max(ground_truth, axis=0) -
                          np.min(ground_truth, axis=0))
     return _compute_me(target, ground_truth) / normalizer
+
+
+def compute_cumulative_error(errors, x_axis):
+    r"""
+    """
+    n_errors = len(errors)
+    cumulative_error = [np.count_nonzero([errors <= x])
+                        for x in x_axis]
+    return np.array(cumulative_error) / n_errors
