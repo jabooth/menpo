@@ -6,8 +6,8 @@ from menpo.image import MaskedImage, BooleanImage
 from menpo.rasterize import GLRasterizer
 from menpo.transform import AlignmentSimilarity, ThinPlateSplines
 from menpo.rasterize.transform import (dims_3to2, dims_2to3,
-                                       model_to_clip_transform,
-                                       optimal_cylindrical_unwrap)
+                                       model_to_clip_transform)
+from menpo.transform import optimal_cylindrical_unwrap
 
 
 def sample_points_and_trilist(mask, sampling_rate=1):
