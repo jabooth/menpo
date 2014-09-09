@@ -1,1 +1,3 @@
-from .flatinterp import FlattenInterpolater, FlattenRasterizer, rigid_align
+from .alignment import icp
+from .flatinterp import (FlattenInterpolater, FlattenRasterizer,
+                         LandmarkAligningFR, ICPAligningFR)

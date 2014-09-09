@@ -1,9 +1,11 @@
 from collections import namedtuple
-import wrapt
+from hdf5able import HDF5able
+from menpo.image import Image
 from menpo.rasterize import (GLRasterizer, model_to_clip_transform,
                              dims_3to2, dims_2to3)
 from menpo.transform import (AlignmentSimilarity, ThinPlateSplines,
                              optimal_cylindrical_unwrap, Transform)
+from .alignment import icp
 
 
 class FlattenInterpolater(Transform):
@@ -87,34 +89,43 @@ FlattenRasterizerResult = namedtuple('FlattenRasterizerResult',
                                      'rgb_image shape_image')
 
 
-class FlattenRasterizer(object):
+class FlattenRasterizer(HDF5able):
 
-    def __init__(self, tgt, transform, image_width=1000, clip_space_scale=0.9):
-        self.dims_3to2, self.dims_2to3 = dims_3to2(), dims_2to3()
+    def __init__(self, sparse_template_3d, transform,
+                 image_width=1000, clip_space_scale=0.8):
         self.transform = transform
-        self.tgt = tgt
-        tgt_test = tgt.copy()
-        tgt_test.landmarks['test_flatten'] = tgt_test
-        # find where the tgt landmarks end up in the flattened space (in 3D)
-        f_tgt_3d = self.transform.apply(tgt_test, group='test_flatten',
-                                        label=None)
+        self.sparse_template_3d = sparse_template_3d
+        test_points = sparse_template_3d.copy()
+        test_points.landmarks['test_flatten'] = test_points
+        # find where the template landmarks end up in the flattened space (in
+        #  3D)
+        f_template_3d = self.transform.apply(test_points, group='test_flatten',
+                                             label=None)
+        f_template_3d._landmarks = None
 
         # Need to decide the appropriate size of the image - check the
-        # ratio of the flatted 2D mesh and use it to infer height
-        r_h, r_w = dims_3to2().apply(f_tgt_3d).range()
+        # ratio of the flatted 2D template and use it to infer height
+        r_h, r_w = dims_3to2().apply(f_template_3d).range()
         ratio_w_to_h = (1.0 * r_w) / r_h
         image_height = int(ratio_w_to_h * image_width)
 
         # Build the rasterizer providing the clip space transform and shape
-        cs_transform = model_to_clip_transform(f_tgt_3d,
+        cs_transform = model_to_clip_transform(f_template_3d,
                                                xy_scale=clip_space_scale)
-        self.r = GLRasterizer(projection_matrix=cs_transform.h_matrix,
-                              width=image_width, height=image_height)
+        # now we have everything we need to construct an approprate rasterizer
+        self.rasterizer = GLRasterizer(projection_matrix=cs_transform.h_matrix,
+                                       width=image_width, height=image_height)
 
         # Save out where the target landmarks land in the image
-        self.i_tgt_2d = self.r.model_to_image_transform.apply(f_tgt_3d)
+        self.sparse_template_2d = self.rasterizer.model_to_image_transform.apply(f_template_3d)
 
-    def __call__(self, mesh, group=None, label='all'):
+    @property
+    def template_image(self):
+        image = Image.blank((self.rasterizer.height, self.rasterizer.width))
+        image.landmarks['sparse_template_2d'] = self.sparse_template_2d
+        return image
+
+    def __call__(self, mesh, **kwargs):
         r"""
         Use a flattened warped mesh to build back a TriMesh in dense
         correspondence.
@@ -130,32 +141,55 @@ class FlattenRasterizer(object):
 
 
         """
-        f_mesh = self.transform.apply(mesh, group=group, label=label)
+        f_mesh = self.transform.apply(mesh, **kwargs)
         return FlattenRasterizerResult(
-            *self.r.rasterize_mesh_with_f3v_interpolant(
-            f_mesh, per_vertex_f3v=f_mesh.points))
+            *self.rasterizer.rasterize_mesh_with_f3v_interpolant(f_mesh,
+                                             per_vertex_f3v=mesh.points))
 
 
-AlignFlattenRasterizerResult = namedtuple('AlignFlattenRasterizerResult',
-                                'aligned_mesh rgb_image shape_image')
+AligningFRResult = namedtuple('AligningFRResult',
+                              'aligned_mesh rgb_image shape_image')
 
 
-@wrapt.decorator
-def rigid_align(wrapped, _, args, kwargs):
-    def _execute(mesh, *args, **kwargs):
-        tgt = wrapped.tgt
-        group = kwargs.get('group')
-        label = kwargs.get('label')
+class AligningFR(HDF5able):
+
+    def __init__(self, flatten_rasterizer):
+        self.fr = flatten_rasterizer
+
+    @property
+    def template_image(self):
+        return self.fr.template_image
+
+    @property
+    def sparse_template_3d(self):
+        return self.fr.sparse_template_3d
+
+    @property
+    def sparse_template_2d(self):
+        return self.fr.sparse_template_2d
+
+
+class LandmarkAligningFR(AligningFR):
+
+    def __call__(self, mesh, group=None, label=None):
         aligned_mesh = AlignmentSimilarity(mesh.landmarks[group][label],
-                                           tgt).apply(mesh)
-        return AlignFlattenRasterizerResult(aligned_mesh,
-                                            *wrapped(aligned_mesh,
-                                                     *args, **kwargs))
-    return _execute(*args, **kwargs)
+                                           self.sparse_template_3d).apply(mesh)
+        fi_result = self.fr(aligned_mesh, group=group, label=label)
+        return AligningFRResult(aligned_mesh, *fi_result)
 
 
-def AlignFlattenRasterizer(tgt, transform, image_width=1000,
-                           clip_space_scale=0.9):
-    return rigid_align(FlattenRasterizer(tgt, transform,
-                                         image_width=image_width,
-                                         clip_space_scale=clip_space_scale))
+class ICPAligningFR(AligningFR):
+
+    def __init__(self, flatten_rasterizer, template_3d):
+        super(ICPAligningFR, self).__init__(flatten_rasterizer)
+        self.template_3d = template_3d
+
+    def __call__(self, mesh):
+        # ICP align with the dense template
+        did_converge, transform = icp(mesh, self.template_3d)
+        if not did_converge:
+            raise ValueError('ICP did not converge')
+        # use the ICP result to align to the dense template, then flatten/rast
+        aligned_mesh = transform.apply(mesh)
+        fi_result = self.fr(aligned_mesh)
+        return AligningFRResult(aligned_mesh, *fi_result)
