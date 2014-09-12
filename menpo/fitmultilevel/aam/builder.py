@@ -219,10 +219,10 @@ class AAMBuilder(DeformableModelBuilder):
                                               self.normalization_diagonal,
                                               verbose=verbose)
 
-        # create pyramid
+        # create pyramid of feature image generator
         generators = create_pyramid(normalized_images, self.n_levels,
                                     self.downscale, self.pyramid_on_features,
-                                    self.features, verbose=verbose)
+                                    self.features)
 
         # build the model at each pyramid level
         if verbose:
@@ -595,14 +595,14 @@ class PatchBasedAAMBuilder(AAMBuilder):
                              self.pyramid_on_features, self.interpolator)
 
 
-def build_reference_frame(landmarks, boundary=3, group='source',
+def build_reference_frame(pointcloud, boundary=3, group='source',
                           trilist=None):
     r"""
     Builds a reference frame from a particular set of landmarks.
 
     Parameters
     ----------
-    landmarks : :map:`PointCloud`
+    pointcloud : :map:`PointCloud`
         The landmarks that will be used to build the reference frame.
 
     boundary : `int`, optional
@@ -625,7 +625,7 @@ def build_reference_frame(landmarks, boundary=3, group='source',
     reference_frame : :map:`Image`
         The reference frame.
     """
-    reference_frame = _build_reference_frame(landmarks, boundary=boundary,
+    reference_frame = _build_reference_frame(pointcloud, boundary=boundary,
                                              group=group)
     if trilist is not None:
         reference_frame.landmarks[group] = TriMesh(
@@ -675,13 +675,16 @@ def build_patch_reference_frame(landmarks, boundary=3, group='source',
     return reference_frame
 
 
-def _build_reference_frame(landmarks, boundary=3, group='source'):
-    # translate landmarks to the origin
-    minimum = landmarks.bounds(boundary=boundary)[0]
-    landmarks = Translation(-minimum).apply(landmarks)
+from menpo.image import BooleanImage
 
-    resolution = landmarks.range(boundary=boundary)
-    reference_frame = MaskedImage.blank(resolution)
-    reference_frame.landmarks[group] = landmarks
+
+def _build_reference_frame(pointcloud, boundary=3, group='source'):
+    # translate landmarks to the origin
+    minimum = pointcloud.bounds(boundary=boundary)[0]
+    pointcloud = Translation(-minimum).apply(pointcloud)
+
+    resolution = pointcloud.range(boundary=boundary)
+    reference_frame = BooleanImage.blank(resolution)
+    reference_frame.landmarks[group] = pointcloud
 
     return reference_frame

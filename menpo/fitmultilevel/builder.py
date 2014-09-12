@@ -8,6 +8,9 @@ from menpo.transform import Scale, Translation, GeneralizedProcrustesAnalysis
 from menpo.visualize import print_dynamic, progress_bar_str
 
 
+# COMPATIBILITY ONLY
+# this works on every image at once - we generally don't want this going
+# forward
 def normalization_wrt_reference_shape(images, group, label,
                                       normalization_diagonal, verbose=False):
     r"""
@@ -83,70 +86,11 @@ def normalization_wrt_reference_shape(images, group, label,
     return reference_shape, normalized_images
 
 
-def normalize_wrt_reference_shape(reference_shape, group, label, image):
-    return image.rescale_to_reference_shape(reference_shape, group=group,
-                                            label=label)
-
-
-def calculate_reference_shape(landmarks, group, label,
-                              normalization_diagonal=None):
-    shapes = [lms[group][label] for lms in landmarks]
-    reference_shape = mean_pointcloud(shapes)
-    # fix the reference_shape's diagonal length if asked
-    if normalization_diagonal:
-        x, y = reference_shape.range()
-        scale = normalization_diagonal / np.sqrt(x**2 + y**2)
-        Scale(scale, reference_shape.n_dims).apply_inplace(reference_shape)
-    return reference_shape
-
-
-def build_shape_model(shapes, max_components):
-    r"""
-    Builds a shape model given a set of shapes.
-
-    Parameters
-    ----------
-    shapes: list of :map:`PointCloud`
-        The set of shapes from which to build the model.
-    max_components: None or int or float
-        Specifies the number of components of the trained shape model.
-        If int, it specifies the exact number of components to be retained.
-        If float, it specifies the percentage of variance to be retained.
-        If None, all the available components are kept (100% of variance).
-
-    Returns
-    -------
-    shape_model: :class:`menpo.model.pca`
-        The PCA shape model.
-    """
-    # centralize shapes
-    centered_shapes = [Translation(-s.centre).apply(s) for s in shapes]
-    # align centralized shape using Procrustes Analysis
-    gpa = GeneralizedProcrustesAnalysis(centered_shapes)
-    aligned_shapes = [s.aligned_source for s in gpa.transforms]
-
-    # build shape model
-    shape_model = PCAModel(aligned_shapes)
-    if max_components is not None:
-        # trim shape model if required
-        shape_model.trim_components(max_components)
-
-    return shape_model
-
-
-def pyramid_of_warped_feature_images(n_levels, downscale, pyramid_on_features,
-                                     features, group, label, frames,
-                                     transforms, image):
-    # images is a generator that yields each of the pyramid levels in
-    # turn, with features applied as dictated by pyramid_on_features.
-    images = pyramid_of_feature_images(n_levels, downscale,
-                                       pyramid_on_features, features, image)
-    # we want to return a generator that yields these images warped
-    return warp_images_to_frame(group, label, frames, transforms, images)
-
-
+# COMPATIBILITY ONLY
+# this works on every image at once - we generally don't want this going
+# forward
 def create_pyramid(images, n_levels, downscale, pyramid_on_features,
-                   features, verbose=False):
+                   features):
     r"""
     Function that creates a generator function for Gaussian pyramid. The
     pyramid can be created either on the feature space or the original
@@ -179,7 +123,58 @@ def create_pyramid(images, n_levels, downscale, pyramid_on_features,
         The generator function of the Gaussian pyramid.
     """
     return [pyramid_of_feature_images(i, n_levels, downscale,
-                              pyramid_on_features, features) for i in images]
+                                      pyramid_on_features, features) for i in images]
+
+
+from functools import partial
+from menpo.feature import no_op
+from menpo.transform import PiecewiseAffine
+
+
+class AAMBuild(object):
+
+    def __init__(self, landmarks, group=None, label=None, diagonal=None,
+                 n_levels=3, downscale=2, pyramid_on_features=False,
+                 features=no_op, transform=PiecewiseAffine):
+        reference_shape = calculate_reference_shape(landmarks, group,
+                                                    label, diagonal=diagonal)
+        self.normalize = partial(normalize_wrt_reference_shape,
+                                 reference_shape, group, label)
+        # todo prepare frames (new func)
+        self.pyramid = partial(pyramid_of_warped_feature_images, n_levels,
+                               downscale, pyramid_on_features, features, group,
+                               label, reference_shape, transform)
+
+    def __call__(self, image):
+        return self.pyramid(self.normalize(image))
+
+
+def normalize_wrt_reference_shape(reference_shape, group, label, image):
+    return image.rescale_to_reference_shape(reference_shape, group=group,
+                                            label=label)
+
+
+def calculate_reference_shape(landmarks, group, label,
+                              diagonal=None):
+    shapes = [lms[group][label] for lms in landmarks]
+    reference_shape = mean_pointcloud(shapes)
+    # fix the reference_shape's diagonal length if asked
+    if diagonal:
+        x, y = reference_shape.range()
+        scale = diagonal / np.sqrt(x**2 + y**2)
+        Scale(scale, reference_shape.n_dims).apply_inplace(reference_shape)
+    return reference_shape
+
+
+def pyramid_of_warped_feature_images(n_levels, downscale, pyramid_on_features,
+                                     features, group, label, frames,
+                                     transforms, image):
+    # images is a generator that yields each of the pyramid levels in
+    # turn, with features applied as dictated by pyramid_on_features.
+    images = pyramid_of_feature_images(n_levels, downscale,
+                                       pyramid_on_features, features, image)
+    # we want to return a generator that yields these images warped
+    return warp_images_to_frame(group, label, frames, transforms, images)
 
 
 def pyramid_of_feature_images(n_levels, downscale, pyramid_on_features,
@@ -215,6 +210,40 @@ def warp_image_to_frame(group, label, frame, transform, image):
     transform.set_target(image.landmarks[group][label])
     # warp the image
     return image.warp_to(frame, transform)
+
+
+def build_shape_model(shapes, max_components):
+    r"""
+    Builds a shape model given a set of shapes.
+
+    Parameters
+    ----------
+    shapes: list of :map:`PointCloud`
+        The set of shapes from which to build the model.
+    max_components: None or int or float
+        Specifies the number of components of the trained shape model.
+        If int, it specifies the exact number of components to be retained.
+        If float, it specifies the percentage of variance to be retained.
+        If None, all the available components are kept (100% of variance).
+
+    Returns
+    -------
+    shape_model: :class:`menpo.model.pca`
+        The PCA shape model.
+    """
+    # centralize shapes
+    centered_shapes = [Translation(-s.centre).apply(s) for s in shapes]
+    # align centralized shape using Procrustes Analysis
+    gpa = GeneralizedProcrustesAnalysis(centered_shapes)
+    aligned_shapes = [s.aligned_source for s in gpa.transforms]
+
+    # build shape model
+    shape_model = PCAModel(aligned_shapes)
+    if max_components is not None:
+        # trim shape model if required
+        shape_model.trim_components(max_components)
+
+    return shape_model
 
 
 class DeformableModelBuilder(object):
