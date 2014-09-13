@@ -82,7 +82,7 @@ def check_n_levels(n_levels):
         raise ValueError("n_levels must be int > 0")
 
 
-def check_downscale(downscale):
+def check_downscales(downscale):
     r"""
     Checks the downscale factor of the pyramid that must be >= 1.
     """

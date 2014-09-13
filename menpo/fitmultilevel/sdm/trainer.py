@@ -157,7 +157,7 @@ class SDTrainer(object):
 
         # general deformable model checks
         checks.check_n_levels(n_levels)
-        checks.check_downscale(downscale)
+        checks.check_downscales(downscale)
         features = checks.check_features(features, n_levels,
                                          pyramid_on_features)
 

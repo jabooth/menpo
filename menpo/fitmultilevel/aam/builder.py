@@ -160,7 +160,7 @@ class AAMBuilder(DeformableModelBuilder):
                  max_appearance_components=None, boundary=3):
         # check parameters
         checks.check_n_levels(n_levels)
-        checks.check_downscale(downscale)
+        checks.check_downscales(downscale)
         checks.check_normalization_diagonal(normalization_diagonal)
         checks.check_boundary(boundary)
         max_shape_components = checks.check_max_components(
@@ -175,7 +175,7 @@ class AAMBuilder(DeformableModelBuilder):
         self.trilist = trilist
         self.normalization_diagonal = normalization_diagonal
         self.n_levels = n_levels
-        self.downscale = downscale
+        self.downscales = downscale
         self.scaled_shape_models = scaled_shape_models
         self.pyramid_on_features = pyramid_on_features
         self.max_shape_components = max_shape_components
@@ -217,7 +217,7 @@ class AAMBuilder(DeformableModelBuilder):
 
         # create pyramid
         generators = create_pyramid(normalized_images, self.n_levels,
-                                    self.downscale, self.pyramid_on_features,
+                                    self.downscales, self.pyramid_on_features,
                                     self.features, verbose=verbose)
 
         # build the model at each pyramid level
@@ -370,7 +370,7 @@ class AAMBuilder(DeformableModelBuilder):
         from .base import AAM
         return AAM(shape_models, appearance_models, n_training_images,
                    self.transform, self.features, self.reference_shape,
-                   self.downscale, self.scaled_shape_models,
+                   self.downscales, self.scaled_shape_models,
                    self.pyramid_on_features)
 
 
@@ -509,28 +509,28 @@ class PatchBasedAAMBuilder(AAMBuilder):
         `string` or a `function` or a list containing one of those
     """
     def __init__(self, features='hog', patch_shape=(16, 16),
-                 normalization_diagonal=None, n_levels=3, downscale=2,
+                 normalization_diagonal=None, downscales=(2, 4),
                  scaled_shape_models=True, pyramid_on_features=True,
                  max_shape_components=None, max_appearance_components=None,
                  boundary=3):
         # check parameters
-        checks.check_n_levels(n_levels)
-        checks.check_downscale(downscale)
+        checks.check_downscales(downscales)
+        self.downscales = downscale
+
         checks.check_normalization_diagonal(normalization_diagonal)
         checks.check_boundary(boundary)
         max_shape_components = checks.check_max_components(
-            max_shape_components, n_levels, 'max_shape_components')
+            max_shape_components, self.n_levels, 'max_shape_components')
         max_appearance_components = checks.check_max_components(
-            max_appearance_components, n_levels, 'max_appearance_components')
-        features = checks.check_features(features, n_levels,
+            max_appearance_components, self.n_levels,
+            'max_appearance_components')
+        features = checks.check_features(features, self.n_levels,
                                          pyramid_on_features)
 
         # store parameters
         self.features = features
         self.patch_shape = patch_shape
         self.normalization_diagonal = normalization_diagonal
-        self.n_levels = n_levels
-        self.downscale = downscale
         self.scaled_shape_models = scaled_shape_models
         self.pyramid_on_features = pyramid_on_features
         self.max_shape_components = max_shape_components
@@ -539,6 +539,11 @@ class PatchBasedAAMBuilder(AAMBuilder):
 
         # patch-based AAMs can only work with TPS transform
         self.transform = ThinPlateSplines
+
+
+    @property
+    def n_levels(self):
+        return len(self.downscales)
 
     def _build_reference_frame(self, mean_shape):
         r"""
@@ -592,7 +597,7 @@ class PatchBasedAAMBuilder(AAMBuilder):
         return PatchBasedAAM(shape_models, appearance_models,
                              n_training_images, self.patch_shape,
                              self.transform, self.features,
-                             self.reference_shape, self.downscale,
+                             self.reference_shape, self.downscales,
                              self.scaled_shape_models,
                              self.pyramid_on_features)
 

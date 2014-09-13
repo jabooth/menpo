@@ -128,7 +128,7 @@ class CLMBuilder(DeformableModelBuilder):
 
         # general deformable model checks
         checks.check_n_levels(n_levels)
-        checks.check_downscale(downscale)
+        checks.check_downscales(downscale)
         checks.check_normalization_diagonal(normalization_diagonal)
         checks.check_boundary(boundary)
         max_shape_components = checks.check_max_components(

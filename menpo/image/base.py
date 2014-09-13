@@ -1140,29 +1140,50 @@ class Image(Vectorizable, LandmarkableViewable):
         # floating point inaccuracy.
         return self.rescale(scales, round='round', order=order)
 
-    def pyramid(self, n_levels=3, downscale=2):
-        image = self
-        yield image
-        for _ in range(n_levels - 1):
-            image = image.rescale(1.0 / downscale)
-            yield image
-
-    def gaussian_pyramid(self, n_levels=3, downscale=2, sigma=None):
+    def pyramid(self, downscales=(2, 4)):
         r"""
-        Return the gaussian pyramid of this image. The first image of the
-        pyramid will be the original, unmodified, image, and counts as level 1.
+        Produce a sequence of smaller copies of this image.
+        The first image of the pyramid will be the original, unmodified,
+        image.
 
         Parameters
         ----------
-        n_levels : int, optional
-            Total number of levels in the pyramid, including the original
-            unmodified image
+        downscales: iterable of floats
+            The downscale factors to be applied, always relative to the
+            full image shape. Note that the first image yielded is always the
+            current image. The second image yielded will be downscaled wrt the
+            original by the first value provided here, the third
+            image yielded downscaled by the second factor wrt the original
+            and so on. This means a total of len(downscales) + 1 images
+            will be yielded.
 
-        downscale : float, optional
-            Downscale factor.
+        """
+        yield self
+        for s in downscales:
+            yield self.rescale(1.0 / s)
+
+    def gaussian_pyramid(self, downscales=(2, 4), sigma=None):
+        r"""
+        Produce a sequence of smaller gaussian filtered copies of this image.
+        The first image of the pyramid will be the original, unmodified,
+        image.
+
+        Parameters
+        ----------
+
+        downscales: iterable of floats
+            The downscale factors to be applied, always relative to the
+            full image shape. Note that the first image yielded is always the
+            current image. The second image yielded will be downscaled wrt the
+            original by the first value provided here, the third
+            image yielded downscaled by the second factor wrt the original
+            and so on. This means a total of len(downscales) + 1 images
+            will be yielded.
 
         sigma : float, optional
-            Sigma for gaussian filter. Default is `downscale / 3.` which
+            Sigma for gaussian filter. Default is `relative_downscale / 3.`
+            where relative downscale is the amount ratio of change in the
+            size of each level (this is calculated for you). This
             corresponds to a filter mask twice the size of the scale factor
             that covers more than 99% of the gaussian distribution.
 
@@ -1172,12 +1193,15 @@ class Image(Vectorizable, LandmarkableViewable):
             Generator yielding pyramid layers as menpo image objects.
         """
         from menpo.feature import gaussian_filter
-        if sigma is None:
-            sigma = downscale / 3.
         image = self
         yield image
-        for level in range(n_levels - 1):
-            image = gaussian_filter(image, sigma).rescale(1.0 / downscale)
+        prev_s = 1
+        for s in downscales:
+            relative_s = s / prev_s  # calculate the relative downscale
+            prev_s = s
+            if sigma is None:
+                sigma = relative_s / 3
+            image = gaussian_filter(image, sigma).rescale(1 / relative_s)
             yield image
 
     def as_greyscale(self, mode='luminosity', channel=None):
