@@ -5,14 +5,15 @@ from menpo.shape import TriMesh
 from menpo.image import MaskedImage
 from menpo.transform import Translation
 from menpo.transform.piecewiseaffine import PiecewiseAffine
+from menpo.fitmultilevel.base import create_pyramid
 from menpo.transform.thinplatesplines import ThinPlateSplines
 from menpo.model import PCAModel
 from menpo.fitmultilevel.builder import (DeformableModelBuilder,
                                          normalization_wrt_reference_shape,
-                                         build_shape_model, create_pyramid)
+                                         build_shape_model)
 from menpo.fitmultilevel import checks
 from menpo.visualize import print_dynamic, progress_bar_str
-from menpo.feature import igo
+from menpo.feature import igo, hog
 
 
 class AAMBuilder(DeformableModelBuilder):
@@ -21,18 +22,19 @@ class AAMBuilder(DeformableModelBuilder):
 
     Parameters
     ----------
-    features : `function` or list of those, optional
-        If list of length ``n_levels``, then a feature is defined per level.
-        This requires that the ``pyramid_on_features`` flag is
-        ``False``, so that the features are extracted at each level.
+    features : `callable` or ``[callable]``, optional
+        If list of length ``n_levels``, feature extraction is performed at
+        each level after downscaling of the image.
         The first element of the list specifies the features to be extracted at
         the lowest pyramidal level and so on.
 
-        If not a list or a list with length ``1``, then:
-            If ``pyramid_on_features`` is ``True``, the specified feature will
-            be applied to the highest level.
-            If ``pyramid_on_features`` is ``False``, the specified feature will
-            be applied to all pyramid levels.
+        If ``callable`` the specified feature will be applied to the original
+        image and pyramid generation will be performed on top of the feature
+        image. Also see the `pyramid_on_features` property.
+
+        Note that from our experience, this approach of extracting features
+        once and then creating a pyramid on top tends to lead to better
+        performing AAMs.
 
     transform : :map:`PureAlignmentTransform`, optional
         The :map:`PureAlignmentTransform` that will be
@@ -75,15 +77,6 @@ class AAMBuilder(DeformableModelBuilder):
         have the same size.
 
         Note that from our experience, if ``scaled_shape_models`` is ``False``,
-        AAMs tend to have slightly better performance.
-
-    pyramid_on_features : `boolean`, optional
-        If ``True``, the feature space is computed once at the highest scale and
-        the Gaussian pyramid is applied on the feature images.
-
-        If ``False``, the Gaussian pyramid is applied on the original images
-        (intensities) and then features will be extracted at each level.
-        Note that from our experience, if ``pyramid_on_features`` is ``True``,
         AAMs tend to have slightly better performance.
 
     max_shape_components : ``None`` or `int` > 0 or ``0`` <= `float` <= ``1`` or list of those, optional
@@ -149,15 +142,12 @@ class AAMBuilder(DeformableModelBuilder):
     ValueError
         ``features`` must be a `function` or a list of those
         containing ``1`` or ``n_levels`` elements
-    ValueError
-        ``pyramid_on_features`` is enabled so ``features`` must be a
-        `string` or a `function` or a list containing ``1`` of those
     """
     def __init__(self, features=igo, transform=PiecewiseAffine,
                  trilist=None, normalization_diagonal=None,
                  downscales=(2, 2, 2), scaled_shape_models=True,
-                 pyramid_on_features=True, max_shape_components=None,
-                 max_appearance_components=None, boundary=3):
+                 max_shape_components=None, max_appearance_components=None,
+                 boundary=3):
         DeformableModelBuilder.__init__(self, downscales)
 
         # check parameters
@@ -169,15 +159,13 @@ class AAMBuilder(DeformableModelBuilder):
         max_appearance_components = checks.check_max_components(
             max_appearance_components, self.n_levels,
             'max_appearance_components')
-        features = checks.check_features(features, self.n_levels,
-                                         pyramid_on_features)
+        features = checks.check_features(features, self.n_levels)
         # store parameters
         self.features = features
         self.transform = transform
         self.trilist = trilist
         self.normalization_diagonal = normalization_diagonal
         self.scaled_shape_models = scaled_shape_models
-        self.pyramid_on_features = pyramid_on_features
         self.max_shape_components = max_shape_components
         self.max_appearance_components = max_appearance_components
         self.boundary = boundary
@@ -217,8 +205,7 @@ class AAMBuilder(DeformableModelBuilder):
 
         # create pyramid
         generators = create_pyramid(normalized_images, self.n_levels,
-                                    self.downscales, self.pyramid_on_features,
-                                    self.features)
+                                    self.downscales, self.features)
 
         # build the model at each pyramid level
         if verbose:
@@ -360,8 +347,7 @@ class AAMBuilder(DeformableModelBuilder):
         from .base import AAM
         return AAM(shape_models, appearance_models, n_training_images,
                    self.transform, self.features, self.reference_shape,
-                   self.downscales, self.scaled_shape_models,
-                   self.pyramid_on_features)
+                   self.downscales, self.scaled_shape_models)
 
 
 class PatchBasedAAMBuilder(AAMBuilder):
@@ -370,18 +356,19 @@ class PatchBasedAAMBuilder(AAMBuilder):
 
     Parameters
     ----------
-    features : `function` or list of those, optional
-        If list of length ``n_levels``, then a feature is defined per level.
-        However, this requires that the ``pyramid_on_features`` flag is
-        ``False``, so that the features are extracted at each level.
-        The first element of the list specifies the features to be extracted
-        at the lowest pyramidal level and so on.
+    features : `callable` or ``[callable]``, optional
+        If list of length ``n_levels``, feature extraction is performed at
+        each level after downscaling of the image.
+        The first element of the list specifies the features to be extracted at
+        the lowest pyramidal level and so on.
 
-        If not a list or a list with length ``1``, then:
-            If ``pyramid_on_features`` is ``True``, the specified feature will
-            be applied to the highest level.
-            If ``pyramid_on_features`` is ``False``, the specified feature will
-            be applied to all pyramid levels.
+        If ``callable`` the specified feature will be applied to the original
+        image and pyramid generation will be performed on top of the feature
+        image. Also see the `pyramid_on_features` property.
+
+        Note that from our experience, this approach of extracting features
+        once and then creating a pyramid on top tends to lead to better
+        performing AAMs.
 
     patch_shape : tuple of `int`, optional
         The appearance model of the Patch-Based AAM will be obtained by
@@ -422,16 +409,6 @@ class PatchBasedAAMBuilder(AAMBuilder):
         have the same size.
         Note that from our experience, if scaled_shape_models is ``False``, AAMs
         tend to have slightly better performance.
-
-    pyramid_on_features : `boolean`, optional
-        If ``True``, the feature space is computed once at the highest scale and
-        the Gaussian pyramid is applied on the feature images.
-
-        If ``False``, the Gaussian pyramid is applied on the original images
-        (intensities) and then features will be extracted at each level.
-
-        Note that from our experience, if ``pyramid_on_features`` is ``True``,
-        AAMs tend to have slightly better performance.
 
     max_shape_components : ``None`` or `int` > 0 or ``0`` <= `float` <= ``1`` or list of those, optional
         If list of length ``n_levels``, then a number of shape components is
@@ -498,11 +475,10 @@ class PatchBasedAAMBuilder(AAMBuilder):
         ``pyramid_on_features`` is enabled so ``features`` must be a
         `string` or a `function` or a list containing one of those
     """
-    def __init__(self, features='hog', patch_shape=(16, 16),
+    def __init__(self, features=hog, patch_shape=(16, 16),
                  normalization_diagonal=None, downscales=(2, 4),
-                 scaled_shape_models=True, pyramid_on_features=True,
-                 max_shape_components=None, max_appearance_components=None,
-                 boundary=3):
+                 scaled_shape_models=True, max_shape_components=None,
+                 max_appearance_components=None, boundary=3):
         DeformableModelBuilder.__init__(self, downscales)
 
         # check parameters
@@ -513,15 +489,13 @@ class PatchBasedAAMBuilder(AAMBuilder):
         max_appearance_components = checks.check_max_components(
             max_appearance_components, self.n_levels,
             'max_appearance_components')
-        features = checks.check_features(features, self.n_levels,
-                                         pyramid_on_features)
+        features = checks.check_features(features, self.n_levels)
 
         # store parameters
         self.features = features
         self.patch_shape = patch_shape
         self.normalization_diagonal = normalization_diagonal
         self.scaled_shape_models = scaled_shape_models
-        self.pyramid_on_features = pyramid_on_features
         self.max_shape_components = max_shape_components
         self.max_appearance_components = max_appearance_components
         self.boundary = boundary
@@ -582,8 +556,7 @@ class PatchBasedAAMBuilder(AAMBuilder):
                              n_training_images, self.patch_shape,
                              self.transform, self.features,
                              self.reference_shape, self.downscales,
-                             self.scaled_shape_models,
-                             self.pyramid_on_features)
+                             self.scaled_shape_models)
 
 
 def build_reference_frame(landmarks, boundary=3, group='source',
