@@ -122,18 +122,16 @@ class CLMBuilder(DeformableModelBuilder):
     """
     def __init__(self, classifier_trainers=linear_svm_lr, patch_shape=(5, 5),
                  features=sparse_hog, normalization_diagonal=None,
-                 n_levels=3, downscale=1.1, scaled_shape_models=True,
+                 downscales=(1.1, 2.2, 3.3), scaled_shape_models=True,
                  pyramid_on_features=False, max_shape_components=None,
                  boundary=3):
-
+        DeformableModelBuilder.__init__(self, downscales)
         # general deformable model checks
-        checks.check_n_levels(n_levels)
-        checks.check_downscales(downscale)
         checks.check_normalization_diagonal(normalization_diagonal)
         checks.check_boundary(boundary)
         max_shape_components = checks.check_max_components(
-            max_shape_components, n_levels, 'max_shape_components')
-        features = checks.check_features(features, n_levels,
+            max_shape_components, self.n_levels, 'max_shape_components')
+        features = checks.check_features(features, self.n_levels,
                                          pyramid_on_features)
 
         # CLM specific checks
@@ -145,8 +143,6 @@ class CLMBuilder(DeformableModelBuilder):
         self.patch_shape = patch_shape
         self.features = features
         self.normalization_diagonal = normalization_diagonal
-        self.n_levels = n_levels
-        self.downscale = downscale
         self.scaled_shape_models = scaled_shape_models
         self.pyramid_on_features = pyramid_on_features
         self.max_shape_components = max_shape_components
@@ -183,7 +179,7 @@ class CLMBuilder(DeformableModelBuilder):
 
         # create pyramid
         generators = create_pyramid(normalized_images, self.n_levels,
-                                    self.downscale,  self.pyramid_on_features,
+                                    self.downscales,  self.pyramid_on_features,
                                     self.features)
 
         # build the model at each pyramid level
@@ -320,7 +316,7 @@ class CLMBuilder(DeformableModelBuilder):
         from .base import CLM
         return CLM(shape_models, classifiers, n_training_images,
                    self.patch_shape, self.features, self.reference_shape,
-                   self.downscale, self.scaled_shape_models,
+                   self.downscales, self.scaled_shape_models,
                    self.pyramid_on_features)
 
 

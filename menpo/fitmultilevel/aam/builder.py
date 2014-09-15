@@ -154,28 +154,28 @@ class AAMBuilder(DeformableModelBuilder):
         `string` or a `function` or a list containing ``1`` of those
     """
     def __init__(self, features=igo, transform=PiecewiseAffine,
-                 trilist=None, normalization_diagonal=None, n_levels=3,
-                 downscale=2, scaled_shape_models=True,
+                 trilist=None, normalization_diagonal=None,
+                 downscales=(2, 2, 2), scaled_shape_models=True,
                  pyramid_on_features=True, max_shape_components=None,
                  max_appearance_components=None, boundary=3):
+        DeformableModelBuilder.__init__(self, downscales)
+
         # check parameters
-        checks.check_n_levels(n_levels)
-        checks.check_downscales(downscale)
+        checks.check_downscales(downscales)
         checks.check_normalization_diagonal(normalization_diagonal)
         checks.check_boundary(boundary)
         max_shape_components = checks.check_max_components(
-            max_shape_components, n_levels, 'max_shape_components')
+            max_shape_components, self.n_levels, 'max_shape_components')
         max_appearance_components = checks.check_max_components(
-            max_appearance_components, n_levels, 'max_appearance_components')
-        features = checks.check_features(features, n_levels,
+            max_appearance_components, self.n_levels,
+            'max_appearance_components')
+        features = checks.check_features(features, self.n_levels,
                                          pyramid_on_features)
         # store parameters
         self.features = features
         self.transform = transform
         self.trilist = trilist
         self.normalization_diagonal = normalization_diagonal
-        self.n_levels = n_levels
-        self.downscales = downscale
         self.scaled_shape_models = scaled_shape_models
         self.pyramid_on_features = pyramid_on_features
         self.max_shape_components = max_shape_components
@@ -503,10 +503,9 @@ class PatchBasedAAMBuilder(AAMBuilder):
                  scaled_shape_models=True, pyramid_on_features=True,
                  max_shape_components=None, max_appearance_components=None,
                  boundary=3):
-        # check parameters
-        checks.check_downscales(downscales)
-        self.downscales = downscales
+        DeformableModelBuilder.__init__(self, downscales)
 
+        # check parameters
         checks.check_normalization_diagonal(normalization_diagonal)
         checks.check_boundary(boundary)
         max_shape_components = checks.check_max_components(
@@ -529,11 +528,6 @@ class PatchBasedAAMBuilder(AAMBuilder):
 
         # patch-based AAMs can only work with TPS transform
         self.transform = ThinPlateSplines
-
-
-    @property
-    def n_levels(self):
-        return len(self.downscales)
 
     def _build_reference_frame(self, mean_shape):
         r"""

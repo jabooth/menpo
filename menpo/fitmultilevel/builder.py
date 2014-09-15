@@ -7,6 +7,8 @@ from menpo.shape import mean_pointcloud
 from menpo.transform import Scale, Translation, GeneralizedProcrustesAnalysis
 from menpo.visualize import print_dynamic, progress_bar_str
 
+from .checks import check_downscales
+
 
 def normalization_wrt_reference_shape(images, group, label,
                                       normalization_diagonal, verbose=False):
@@ -188,13 +190,17 @@ def feature_images(images, features):
 
 
 class DeformableModelBuilder(object):
-    r"""
-    Abstract class with a set of functions useful to build a Deformable Model.
-    """
-    __metaclass__ = abc.ABCMeta
+
+    def __init__(self, downscales):
+        check_downscales(downscales)
+        self.downscales = downscales
 
     @abc.abstractmethod
     def build(self, images, group=None, label=None):
         r"""
         Builds a Multilevel Deformable Model.
         """
+
+    @property
+    def n_levels(self):
+        return len(self.downscales) + 1

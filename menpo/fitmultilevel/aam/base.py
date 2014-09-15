@@ -75,7 +75,7 @@ class AAM(HDF5able):
 
     """
     def __init__(self, shape_models, appearance_models, n_training_images,
-                 transform, features, reference_shape, downscale,
+                 transform, features, reference_shape, downscales,
                  scaled_shape_models, pyramid_on_features):
         self.n_training_images = n_training_images
         self.shape_models = shape_models
@@ -83,7 +83,7 @@ class AAM(HDF5able):
         self.transform = transform
         self.features = features
         self.reference_shape = reference_shape
-        self.downscale = downscale
+        self.downscales = downscales
         self.scaled_shape_models = scaled_shape_models
         self.pyramid_on_features = pyramid_on_features
 
@@ -220,7 +220,7 @@ class AAM(HDF5able):
                 down_str.append('(no downscale)')
             else:
                 down_str.append('(downscale by {})'.format(
-                    self.downscale**(self.n_levels - j - 1)))
+                    self.downscales**(self.n_levels - j - 1)))
         # string about features and channels
         if self.pyramid_on_features:
             if isinstance(self.features[0], str):
@@ -257,13 +257,13 @@ class AAM(HDF5able):
                 out = "{} - Gaussian pyramid with {} levels and downscale " \
                       "factor of {}.\n   - Each level has a scaled shape " \
                       "model (reference frame).\n".format(out, self.n_levels,
-                                                          self.downscale)
+                                                          self.downscales)
 
             else:
                 out = "{} - Gaussian pyramid with {} levels and downscale " \
                       "factor of {}:\n   - Shape models (reference frames) " \
                       "are not scaled.\n".format(out, self.n_levels,
-                                                 self.downscale)
+                                                 self.downscales)
             if self.pyramid_on_features:
                 out = "{}   - Pyramid was applied on feature space.\n   " \
                       "{}{} {} per image.\n".format(out, feat_str,
