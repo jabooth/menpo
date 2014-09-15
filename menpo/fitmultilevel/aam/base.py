@@ -63,7 +63,7 @@ class AAM(DeformableModel, HDF5able):
     """
     def __init__(self, shape_models, appearance_models, n_training_images,
                  transform, features, reference_shape, downscales,
-                 scaled_shape_models,):
+                 scaled_shape_models):
         DeformableModel.__init__(self, features)
         self.n_training_images = n_training_images
         self.shape_models = shape_models
