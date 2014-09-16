@@ -9,7 +9,7 @@ from menpo.model.pca import PCAModel
 from menpo.visualize import print_dynamic, progress_bar_str
 from .base import is_pyramid_on_features
 
-from .checks import check_downscales
+from .checks import check_downscales, check_features
 
 
 def normalization_wrt_reference_shape(images, group, label,
@@ -129,9 +129,11 @@ def build_shape_model(shapes, max_components):
 
 class DeformableModelBuilder(object):
 
-    def __init__(self, downscales):
+    def __init__(self, downscales, features):
         check_downscales(downscales)
         self.downscales = downscales
+        features = check_features(features, self.n_levels)
+        self.features = features
 
     @abc.abstractmethod
     def build(self, images, group=None, label=None):

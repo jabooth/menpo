@@ -116,13 +116,12 @@ class CLMBuilder(DeformableModelBuilder):
                  features=sparse_hog, normalization_diagonal=None,
                  downscales=(1.1, 2.2, 3.3), scaled_shape_models=True,
                  max_shape_components=None, boundary=3):
-        DeformableModelBuilder.__init__(self, downscales)
+        DeformableModelBuilder.__init__(self, downscales, features)
         # general deformable model checks
         checks.check_normalization_diagonal(normalization_diagonal)
         checks.check_boundary(boundary)
         max_shape_components = checks.check_max_components(
             max_shape_components, self.n_levels, 'max_shape_components')
-        features = checks.check_features(features, self.n_levels)
 
         # CLM specific checks
         classifier_trainers = check_classifier_trainers(classifier_trainers,
@@ -132,7 +131,6 @@ class CLMBuilder(DeformableModelBuilder):
         # store parameters
         self.classifier_trainers = classifier_trainers
         self.patch_shape = patch_shape
-        self.features = features
         self.normalization_diagonal = normalization_diagonal
         self.scaled_shape_models = scaled_shape_models
         self.max_shape_components = max_shape_components

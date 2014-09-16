@@ -59,9 +59,6 @@ class AAMBuilder(DeformableModelBuilder):
         reference frame (provided that features computation does not change
         the image size).
 
-    n_levels : `int` > 0, optional
-        The number of multi-resolution pyramidal levels to be used.
-
     downscale : `float` >= ``1``, optional
         The downscale factor that will be used to create the different
         pyramidal levels. The scale factor will be::
@@ -148,7 +145,7 @@ class AAMBuilder(DeformableModelBuilder):
                  downscales=(2, 2, 2), scaled_shape_models=True,
                  max_shape_components=None, max_appearance_components=None,
                  boundary=3):
-        DeformableModelBuilder.__init__(self, downscales)
+        DeformableModelBuilder.__init__(self, downscales, features)
 
         # check parameters
         checks.check_downscales(downscales)
@@ -159,9 +156,7 @@ class AAMBuilder(DeformableModelBuilder):
         max_appearance_components = checks.check_max_components(
             max_appearance_components, self.n_levels,
             'max_appearance_components')
-        features = checks.check_features(features, self.n_levels)
         # store parameters
-        self.features = features
         self.transform = transform
         self.trilist = trilist
         self.normalization_diagonal = normalization_diagonal
@@ -479,7 +474,7 @@ class PatchBasedAAMBuilder(AAMBuilder):
                  normalization_diagonal=None, downscales=(2, 4),
                  scaled_shape_models=True, max_shape_components=None,
                  max_appearance_components=None, boundary=3):
-        DeformableModelBuilder.__init__(self, downscales)
+        DeformableModelBuilder.__init__(self, downscales, features)
 
         # check parameters
         checks.check_normalization_diagonal(normalization_diagonal)
@@ -489,10 +484,8 @@ class PatchBasedAAMBuilder(AAMBuilder):
         max_appearance_components = checks.check_max_components(
             max_appearance_components, self.n_levels,
             'max_appearance_components')
-        features = checks.check_features(features, self.n_levels)
 
         # store parameters
-        self.features = features
         self.patch_shape = patch_shape
         self.normalization_diagonal = normalization_diagonal
         self.scaled_shape_models = scaled_shape_models
