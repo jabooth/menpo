@@ -633,6 +633,59 @@ class PCAVectorModel(MeanLinearModel):
         # now we can set our own components with the updated orthogonal ones
         self.components = Q[linear_model.n_components:, :]
 
+    def orthonormalize_against(self, linear_model):
+        r"""
+        Returns two new models with the property that the union of this
+        model's components and another are both mutually orthonormal.
+
+        Note that the model passed in is guaranteed to not have it's number
+        of available components changed. This model, however, may loose some
+        dimensionality due to reaching a degenerate state.
+
+        The removed components will always be trimmed from the end of
+        components (i.e. the components which capture the least variance).
+        If trimming is performed, `n_components` and `n_available_components`
+        would be altered - see :meth:`trim_components` for details.
+
+        Parameters
+        ----------
+        linear_model : :map:`LinearModel`
+            A second linear model to orthonormalize this against.
+
+        Returns
+        -------
+        (self_ortho, other_otho) : (:class:`LinearModel`,
+        :class:`LinearModel`)
+            Two new linear models which are mutually orthonormal.
+        """
+        # take the QR decomposition of the model components
+        Q = (np.linalg.qr(np.hstack((linear_model._components.T,
+                                     self._components.T)))[0]).T
+        # the model passed to us went first, so all it's components will
+        # survive. Pull them off, and update the other model.
+        linear_model.components = Q[:linear_model.n_components, :]
+        # it's possible that all of our components didn't survive due to
+        # degeneracy. We need to trim our components down before replacing
+        # them to ensure the number of components is consistent (otherwise
+        # the components setter will complain at us)
+        n_available_components = Q.shape[0] - linear_model.n_components
+        if n_available_components < self.n_components:
+            # oh dear, we've lost some components from the end of our model.
+            if self.n_active_components < n_available_components:
+                # save the current number of active components
+                n_active_components = self.n_active_components
+            else:
+                # save the current number of available components
+                n_active_components = n_available_components
+            # call trim_components to update our state.
+            self.trim_components(n_components=n_available_components)
+            if n_active_components < n_available_components:
+                # reset the number of active components
+                self.n_active_components = n_active_components
+
+        # now we can set our own components with the updated orthogonal ones
+        self.components = Q[linear_model.n_components:, :]
+
     def increment(self, data, n_samples=None, forgetting_factor=1.0,
                   verbose=False):
         r"""

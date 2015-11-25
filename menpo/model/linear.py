@@ -1,5 +1,7 @@
+from warnings import warn
+
 import numpy as np
-from menpo.base import Copyable
+from menpo.base import Copyable, MenpoDeprecationWarning
 
 
 class LinearModel(Copyable):
@@ -245,11 +247,24 @@ class LinearModel(Copyable):
 
     def orthonormalize_inplace(self):
         r"""
-        Enforces that this model's components are orthonormalized,
+        Deprecated. See the non-mutating API, `orthonormaize()`.
+        """
+        warn('the public API for inplace operations is deprecated '
+             'and will be removed in a future version of Menpo. '
+             'Use .orthonormize() instead.', MenpoDeprecationWarning)
+        Q = np.linalg.qr(self.components.T)[0].T
+        self.components[...] = Q
+
+    def orthonormalize(self):
+        r"""
+        Returns a copy of this PCA model where it is enforced that
+        the model's components are orthonormalized,
         s.t. ``component_vector(i).dot(component_vector(j) = dirac_delta``.
         """
         Q = np.linalg.qr(self.components.T)[0].T
-        self.components[...] = Q
+        new = self.copy()
+        new.components[...] = Q
+        return new
 
     # TODO: Investigate the meaning and consequences of trying to
     # orthonormalize two identical vectors
@@ -285,6 +300,50 @@ class LinearModel(Copyable):
         linear_model.components = Q[:linear_model.n_components, :]
         # set the orthonormalized components of this model
         self.components = Q[linear_model.n_components:, :]
+
+    def orthonormalize_against(self, linear_model):
+        r"""
+        Returns two new models with the property that the union of this
+        model's components and another are both mutually orthonormal.
+
+        Both models keep its number of components unchanged or else a value
+        error is raised.
+
+        Parameters
+        ----------
+        linear_model : :class:`LinearModel`
+            A second linear model to orthonormalize this against.
+
+        Returns
+        -------
+        (self_ortho, other_otho) : (:class:`LinearModel`,
+        :class:`LinearModel`)
+            Two new linear models which are mutually orthonormal.
+
+        Raises
+        ------
+        ValueError
+            The number of features must be greater or equal than the sum of the
+            number of components in both linear models ({} < {})
+        """
+        n_components_sum = self.n_components + linear_model.n_components
+        if not self.n_features >= n_components_sum:
+            raise ValueError(
+                "The number of features must be greater or equal than the "
+                "sum of the number of components in both linear models ({} < "
+                "{})".format(self.n_features, n_components_sum))
+        # take the QR decomposition of the model components
+        Q = (np.linalg.qr(np.hstack((linear_model._components.T,
+                                     self._components.T)))[0]).T
+        # create copies of self and the other model
+        new_self = self.copy()
+        new_other = linear_model.copy()
+        # set the orthonormalized components of this model
+        new_self.components = Q[linear_model.n_components:, :]
+        # set the orthonormalized components of the model being passed
+        new_other.components = Q[:linear_model.n_components, :]
+        # return both models
+        return new_self, new_other
 
 
 class MeanLinearModel(LinearModel):
