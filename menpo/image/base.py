@@ -21,6 +21,29 @@ from .patches import extract_patches, set_patches
 _greyscale_luminosity_coef = None
 
 
+
+def warp_to_shape(self, template_shape, transform, warp_landmarks=True,
+                      order=1, mode='constant', cval=0.0, batch_size=None,
+                      return_transform=False):
+        template_shape = np.array(template_shape, dtype=np.int)
+        template_points = indices_for_image_of_shape(template_shape)
+        points_to_sample = transform.apply(template_points,
+                                           batch_size=batch_size)
+        sampled = self.sample(points_to_sample,
+                              order=order, mode=mode, cval=cval)
+
+        # set any nan values to 0
+        sampled[np.isnan(sampled)] = 0
+        # build a warped version of the image
+        warped_pixels = sampled.reshape(
+            (self.n_channels,) + tuple(template_shape))
+
+        return self._build_warp_to_shape(warped_pixels, transform,
+                                         warp_landmarks, return_transform)
+
+
+
+
 class ImageBoundaryError(ValueError):
     r"""
     Exception that is thrown when an attempt is made to crop an image beyond
@@ -46,7 +69,6 @@ class ImageBoundaryError(ValueError):
         self.requested_max = requested_max
         self.snapped_min = snapped_min
         self.snapped_max = snapped_max
-
 
 def indices_for_image_of_shape(shape):
     r"""
@@ -733,7 +755,7 @@ class Image(Vectorizable, Landmarkable, Viewable, LandmarkableViewable):
                  axes_y_limits=None, axes_x_ticks=None, axes_y_ticks=None,
                  figure_size=(10, 8)):
         r"""
-        View the image using the default image viewer. This method will appear 
+        View the image using the default image viewer. This method will appear
         on the Image as ``view`` if the Image is 2D.
 
         Returns
@@ -766,7 +788,7 @@ class Image(Vectorizable, Landmarkable, Viewable, LandmarkableViewable):
         axes_font_name : See Below, optional
             The font of the axes.
             Example options ::
-            
+
                 {serif, sans-serif, cursive, fantasy, monospace}
 
         axes_font_size : `int`, optional
@@ -776,7 +798,7 @@ class Image(Vectorizable, Landmarkable, Viewable, LandmarkableViewable):
         axes_font_weight : See Below, optional
             The font weight of the axes.
             Example options ::
-            
+
                 {ultralight, light, normal, regular, book, medium, roman,
                 semibold, demibold, demi, bold, heavy, extra bold, black}
 
@@ -930,7 +952,7 @@ class Image(Vectorizable, Landmarkable, Viewable, LandmarkableViewable):
         marker_face_colour : See Below, optional
             The face (filling) colour of the markers.
             Example options ::
-            
+
                 {r, g, b, c, m, k, w}
                 or
                 (3, ) ndarray
@@ -938,9 +960,9 @@ class Image(Vectorizable, Landmarkable, Viewable, LandmarkableViewable):
         marker_edge_colour : See Below, optional
             The edge colour of the markers.
             Example options ::
-            
+
                 {r, g, b, c, m, k, w}
-                or 
+                or
                 (3, ) ndarray
 
         marker_edge_width : `float`, optional
@@ -963,7 +985,7 @@ class Image(Vectorizable, Landmarkable, Viewable, LandmarkableViewable):
         numbers_font_weight : See Below, optional
             The font weight of the numbers.
             Example options ::
-            
+
                 {ultralight, light, normal, regular, book, medium, roman,
                 semibold, demibold, demi, bold, heavy, extra bold, black}
 
@@ -981,7 +1003,7 @@ class Image(Vectorizable, Landmarkable, Viewable, LandmarkableViewable):
             The title of the legend.
         legend_font_name : See below, optional
             The font of the legend. Example options ::
-            
+
                 {serif, sans-serif, cursive, fantasy, monospace}
 
         legend_font_style : ``{normal, italic, oblique}``, optional
@@ -991,7 +1013,7 @@ class Image(Vectorizable, Landmarkable, Viewable, LandmarkableViewable):
         legend_font_weight : See Below, optional
             The font weight of the legend.
             Example options ::
-            
+
                 {ultralight, light, normal, regular, book, medium, roman,
                 semibold, demibold, demi, bold, heavy, extra bold, black}
 
@@ -1036,7 +1058,7 @@ class Image(Vectorizable, Landmarkable, Viewable, LandmarkableViewable):
             If ``True``, the axes will be rendered.
         axes_font_name : See Below, optional
             The font of the axes. Example options ::
-            
+
                 {serif, sans-serif, cursive, fantasy, monospace}
 
         axes_font_size : `int`, optional
@@ -1759,7 +1781,7 @@ class Image(Vectorizable, Landmarkable, Viewable, LandmarkableViewable):
             as self, but with each landmark updated to the warped position.
         order : `int`, optional
             The order of interpolation. The order has to be in the range [0,5]
-            
+
             ========= ====================
             Order     Interpolation
             ========= ====================

@@ -1,6 +1,5 @@
 import numpy as np
 map_coordinates = None  # expensive, from scipy.ndimage
-from menpo.external.skimage._warps_cy import _warp_fast
 from menpo.transform import Homogeneous
 
 # Store out a transform that simply switches the x and y axis
@@ -54,8 +53,8 @@ def scipy_interpolation(pixels, points_to_sample, mode='constant', order=1,
     return np.concatenate(sampled_pixel_values, axis=0)
 
 
-def cython_interpolation(pixels, template_shape, h_transform, mode='constant',
-                         order=1, cval=0.):
+def cython_interpolation(pixels, template_shape, h_transform,
+                                mode='constant', order=1, cval=0.):
     r"""
     Interpolation utilizing skimage fast cython warp function. This method
     assumes that the warp takes the form of a homogeneous transform, and
@@ -108,3 +107,47 @@ def cython_interpolation(pixels, template_shape, h_transform, mode='constant',
     if pixels.dtype == np.bool:
         result = result.astype(np.bool)
     return result
+
+
+def _python_affine_interpolation(pixels, template_shape, h_transform,
+                                 mode='constant', order=1, cval=0.):
+    r"""
+    Interpolation utilizing skimage fast cython warp function. This method
+    assumes that the warp takes the form of a homogeneous transform, and
+    thus is much faster for operations such as scaling.
+
+    Parameters
+    ----------
+    pixels : ``(n_channels, M, N, ...)`` `ndarray`
+        The image to be sampled from, the first axis containing channel
+        information.
+    template_shape : `tuple`
+        The shape of the new image that will be sampled
+    mode : ``{constant, nearest, reflect, wrap}``, optional
+        Points outside the boundaries of the input are filled according to the
+        given mode.
+    order : int, optional
+        The order of the spline interpolation. The order has to be in the
+        range [0,5].
+    cval : `float`, optional
+        The value that should be used for points that are sampled from
+        outside the image bounds if mode is 'constant'
+
+    Returns
+    -------
+    sampled_image : `ndarray`
+        The pixel information sampled at each of the points.
+    """
+    template_points = indices_for_image_of_shape(template_shape)
+    points_to_sample = h_transform.apply(template_points,
+                                         batch_size=batch_size)
+    return scipy_interpolation(points_to_sample,
+                               order=order, mode=mode, cval=cval)
+
+
+try:
+    from menpo.external.skimage._warps_cy import _warp_fast
+except ImportError:
+    affine_interpolation = _python_affine_interpolation
+else:
+    affine_interpolation = cython_interpolation
