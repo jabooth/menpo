@@ -27,11 +27,12 @@ if sys.version_info.major == 2:
 print(find_packages())
 
 setup(name='menpo',
+      description='A Python toolkit for handling annotated data',
+      author='The Menpo Team',
+      author_email='menpo-users@googlegroups.com',
+      url='http://www.menpo.org',
       version=versioneer.get_version(),
       cmdclass=versioneer.get_cmdclass(),
-      description='A Python toolkit for handling annotated data',
-      author='James Booth',
-      author_email='james.booth08@imperial.ac.uk',
       include_dirs=include_dirs,
       ext_modules=cython_exts,
       packages=find_packages(),
