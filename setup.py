@@ -9,7 +9,6 @@ import numpy as np
 
 # ---- C/C++ EXTENSIONS ---- #
 cython_modules = ['menpo/shape/mesh/normals.pyx',
-                  'menpo/transform/piecewiseaffine/fastpwa.pyx',
                   'menpo/feature/windowiterator.pyx',
                   'menpo/feature/gradient.pyx',
                   'menpo/external/skimage/_warps_cy.pyx',
