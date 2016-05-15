@@ -5,13 +5,13 @@ import numpy as np
 scipy_gaussian_filter = None  # expensive
 
 from .base import ndfeature, winitfeature, imgfeature
-from .gradient import gradient_cython
 from .windowiterator import WindowIterator, WindowIteratorResult
 
 
 def _np_gradient(pixels):
     """
-    This method is used in the case of multi-channel images (not 2D images).
+    This method is used in the case of multi-channel images (not 2D images),
+    or for all images in a pure-Python Menpo installation.
     The output ordering is identical to the gradient() method, returning
     a 2 * n_channels image with gradients in order of the first axis derivative
     over all the channels, then the second etc. For example, in the case of
@@ -38,6 +38,18 @@ def _np_gradient(pixels):
     return np.concatenate(grad_per_channel, axis=0)
 
 
+# If we have native compiled modules, use our fast 2D cython gradient.
+# Fall back to numpy's gradient if not.
+try:
+    from .gradient import gradient_cython
+except ImportError:
+    print('falling back to np gradient')
+    _gradient_2d = _np_gradient
+else:
+    print('using the faster cython gradient')
+    _gradient_2d = gradient_cython
+
+0
 @ndfeature
 def gradient(pixels):
     r"""
@@ -68,7 +80,7 @@ def gradient(pixels):
         the ``x``-gradients.
     """
     if (pixels.ndim - 1) == 2:  # 2D Image
-        return gradient_cython(pixels)
+        return _gradient_2d(pixels)
     else:
         return _np_gradient(pixels)
 
