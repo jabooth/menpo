@@ -38,9 +38,7 @@ setup(name='menpo',
       install_requires=install_requires,
       package_data={'menpo': ['data/*',
                               'feature/cpp/*.cpp',
-                              'feature/cpp/*.h',
-                              'transform/piecewiseaffine/fastpwa/*.c',
-                              'transform/piecewiseaffine/fastpwa/*.h'],
+                              'feature/cpp/*.h'],
                     '': ['*.pxd', '*.pyx']},
       tests_require=['nose', 'mock']
 )
