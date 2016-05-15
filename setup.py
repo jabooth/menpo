@@ -1,8 +1,6 @@
-import os
 import sys
 from setuptools import setup, find_packages
 import versioneer
-import glob
 from Cython.Build import cythonize
 import numpy as np
 
@@ -26,6 +24,8 @@ install_requires = ['numpy>=1.10,<1.11',
 if sys.version_info.major == 2:
     install_requires.append('pathlib==1.0')
 
+print(find_packages())
+
 setup(name='menpo',
       version=versioneer.get_version(),
       cmdclass=versioneer.get_cmdclass(),
@@ -36,9 +36,7 @@ setup(name='menpo',
       ext_modules=cython_exts,
       packages=find_packages(),
       install_requires=install_requires,
-      package_data={'menpo': ['data/*',
-                              'feature/cpp/*.cpp',
-                              'feature/cpp/*.h'],
-                    '': ['*.pxd', '*.pyx']},
+      package_data={'menpo': ['data/*'],
+                    '': ['*.pxd', '*.pyx', '*.cpp', '*.h']},
       tests_require=['nose', 'mock']
-)
+      )
