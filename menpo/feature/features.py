@@ -38,18 +38,30 @@ def _np_gradient(pixels):
     return np.concatenate(grad_per_channel, axis=0)
 
 
-# If we have native compiled modules, use our fast 2D cython gradient.
+def _np_gradient_2d(pixels):
+    # Our Cython gradient method (which is only used for 2D images)
+    # raises a TypeError if you try to use it on a uint8 image -
+    # the reason being that this is likely a programmer error
+    # (central difference on something with 255 values is a little kooky).
+    # For now, to match current behavior, in the case where Cython isn't
+    # used we want to raise a TypeError in the same circumstance.
+    if pixels.dtype == np.uint8:
+        raise TypeError('Attempting to take gradient on a 2D uint8 image')
+    else:
+        return _np_gradient(pixels)
+
+# If we have native compiled modules, use our fast 2D Cython gradient.
 # Fall back to numpy's gradient if not.
 try:
-    from .gradient import gradient_cython
+    from .gradient import gradient_cython as _cython_gradient_2d
 except ImportError:
     print('falling back to np gradient')
-    _gradient_2d = _np_gradient
+    _gradient_2d = _np_gradient_2d
 else:
     print('using the faster cython gradient')
-    _gradient_2d = gradient_cython
+    _gradient_2d = _cython_gradient_2d
 
-0
+
 @ndfeature
 def gradient(pixels):
     r"""
