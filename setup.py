@@ -24,8 +24,6 @@ install_requires = ['numpy>=1.10,<1.11',
 if sys.version_info.major == 2:
     install_requires.append('pathlib==1.0')
 
-print(find_packages())
-
 setup(name='menpo',
       description='A Python toolkit for handling annotated data',
       author='The Menpo Team',
