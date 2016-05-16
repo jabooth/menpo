@@ -333,6 +333,28 @@ class MenpoMissingDependencyError(Exception):
         return self.message
 
 
+NATIVE_FUNCTIONALITY_MESSAGE_ERROR = '''
+This functionality is provided by a native compiled module which was not built
+at install time (probably due to no compiler being present during a non-conda
+install). To use this functionality, either: (easy) install Menpo using the
+recommended Conda installation; (harder) ensure you have a valid compiler
+installed and usable for your Python (especially tricky if you are on Windows).
+'''
+
+
+class MenpoNativeFunctionalityError(MenpoMissingDependencyError):
+    r"""
+    An exception that some functionality in Menpo requires a Python native extension
+    to be compiled at install time, which wasn't done.
+    """
+    def __init__(self):
+        super(MenpoNativeFunctionalityError, self).__init__('cython')
+        self.message = NATIVE_FUNCTIONALITY_MESSAGE_ERROR
+
+    def __str__(self):
+        return self.message
+
+
 def name_of_callable(c):
     r"""
     Return the name of a callable (function or callable class) as a string.
