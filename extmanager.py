@@ -49,6 +49,8 @@ def build_ext_without_compile_factory(supercls):
         to compile .pyx->.c/.cpp, and stop there. All this does is override the
         actual compile method build_extension() with a no-op."""
         def build_extension(self, ext):
+            print(ext)
+            print('we are building the cython ext even though its sdist!')
             pass
 
     return BuildExtWithoutCompile
@@ -69,6 +71,20 @@ def build_ext_allowing_failure_factory(supercls):
                 print('Skipping as this is an optional extension.')
 
     return BuildExtAllowingFailure
+
+
+def s_dist_invoking_cython_factory(supercls):
+
+    class SDistInvokingCython(supercls):
+        """Custom sdist that ensures Cython has compiled all pyx files to .c/.cpp"""
+
+        def run(self):
+            print('about to run cython command')
+            self.run_command('cython')
+            print('cython command run.')
+            supercls.run(self)
+
+    return SDistInvokingCython
 
 
 class CythonExtension(object):
@@ -138,16 +154,37 @@ def ext_setup_kwargs(extension_specs, cmdclass=None, min_cython_version=None, fa
                           '\n'.join([p.pyx_path for p in ext_needing_cython])))
             raise ValueError(message)
         else:
+            # whether we are doing a build_ext or sdist/bdist, we have to
+            # ensure that Cython (which is available) is invoked to generate
+            # the required .c/.cpp extensions.
             message = ('Cython will be used to process the following extensions:'
                        '\n{}'.format('\n'.join([p.pyx_path for p in ext_needing_cython])))
             print(message)
-            from Cython.Build import cythonize
-            ext_modules = cythonize([e.as_cythonizable_extension()
-                                     for e in ext_needing_cython], quiet=False)
+
+            # prepare a build_ext that will just compile the pyx files to
+            # .c/.cpp files and stop.
+            cythonize_and_stop_build_ext = build_ext_without_compile_factory(
+                build_ext_with_numpy_include_dir_factory(
+                    cython_build_ext_factory()
+                    )
+                )
+
+            # add this to the cmdclass dict so it is available at sdist time
+            cmdclass['cython'] = cythonize_and_stop_build_ext
+            # now add an sdist command which will invoke cython when we try
+            # to build an sdist.
+            cmdclass['sdist'] = s_dist_invoking_cython_factory(sdist_base_class)
+
+            # make sure the ext modules are ready for processing by the
+            # cythonize compiler.
+            ext_modules = [e.as_cythonizable_extension()
+                           for e in ext_needing_cython]
             print('finished cythonizing')
     else:
-        # Everything has been Cythonized for us - just need to build the modules
-        # directly.
+        # Everything has been Cythonized for us - no need for Cython we
+        # just need to build the modules directly.
+        # note that this also means we are happy to do a sdist command in a
+        # 'standard' fashion.
         ext_modules = [e.as_already_cythonized_extension() for e in extensions]
 
     # We always start from the default build ext and add the numpy
