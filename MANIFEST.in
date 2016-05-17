@@ -1,6 +1,7 @@
 recursive-include menpo *.pxd
 recursive-include menpo *.pyx
 recursive-include menpo *.h
+recursive-include menpo *.c
 recursive-include menpo *.cpp
 include README.md
 include versioneer.py
