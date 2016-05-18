@@ -62,7 +62,7 @@ SETUP_TOOLS_KWARGS = dict(
                       'pillow>=3.0,<4.0',
                       'imageio>=1.5.0,<1.6.0'],
     setup_requires=['numpy>=1.9.1'],
-    packages=find_packages(),  # TODO will this find compiled modules? If it doesn't is that a problem?
+    packages=find_packages()
 )
 
 if sys.version_info.major == 2:
