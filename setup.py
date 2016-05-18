@@ -1,3 +1,6 @@
+import os
+os.environ['PATH'] = '/Users/jab08/miniconda/envs/optcython/bin:/Users/jab08/.nvm/versions/node/v5.11.0/bin:/Applications/Postgres.app/Contents/Versions/latest/bin:/Users/jab08/.bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/X11/bin:/usr/local/go/bin:/Library/TeX/texbin'
+
 from setuptools import setup, find_packages
 import sys
 import versioneer
@@ -53,11 +56,12 @@ SETUP_TOOLS_KWARGS = dict(
     url='http://www.menpo.org',
     package_data={'menpo': ['data/*']},
     tests_require=['nose', 'mock'],
-    install_requires=['numpy>=1.10,<1.11',
-                      'scipy>=0.17,<0.18',
+    install_requires=['numpy>=1.9.1',
+                      'scipy>=0.14',
                       'matplotlib>=1.4,<1.6',
                       'pillow>=3.0,<4.0',
                       'imageio>=1.5.0,<1.6.0'],
+    setup_requires=['numpy>=1.9.1'],
     packages=find_packages(),  # TODO will this find compiled modules? If it doesn't is that a problem?
 )
 
