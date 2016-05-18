@@ -54,15 +54,19 @@ SETUP_TOOLS_KWARGS = dict(
     author='The Menpo Team',
     author_email='menpo-users@googlegroups.com',
     url='http://www.menpo.org',
-    package_data={'menpo': ['data/*']},
-    tests_require=['nose', 'mock'],
+    setup_requires=['numpy>=1.9.1'],
     install_requires=['numpy>=1.9.1',
                       'scipy>=0.14',
-                      'matplotlib>=1.4,<1.6',
-                      'pillow>=3.0,<4.0',
-                      'imageio>=1.5.0,<1.6.0'],
-    setup_requires=['numpy>=1.9.1'],
-    packages=find_packages()
+                      'pillow>=3.0,<4.0'
+                      ],
+    extras_require={
+        'visualization': 'matplotlib>=1.4,<1.6',
+        'video-io': 'imageio>=1.5.0,<1.6.0',
+        'vlfeat-features': 'cyvlfeat >=0.4.3,<0.5'
+    },
+    tests_require=['nose', 'mock'],
+    packages=find_packages(),
+    package_data={'menpo': ['data/*']}
 )
 
 if sys.version_info.major == 2:
