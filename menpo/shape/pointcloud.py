@@ -64,6 +64,54 @@ def bounding_box(closest_to_origin, opposite_corner):
     return PointDirectedGraph(box, adjacency_matrix, copy=False)
 
 
+def bounding_cuboid(near_closest_to_origin, far_opposite_corner):
+    r"""
+    Return a bounding cuboid from the near closest and far opposite
+    corners as a directed graph.
+
+    Parameters
+    ----------
+    near_closest_to_origin : (`float`, `float`, `float`)
+        Three floats representing the coordinates of the near corner closest to
+        the origin.
+    far_opposite_corner  : (`float`, `float`, `float`)
+        Three floats representing the coordinates of the far opposite corner
+        compared to near_closest_to_origin.
+
+    Returns
+    -------
+    bounding_box : :map:`PointDirectedGraph`
+        The axis aligned bounding cuboid from the two given corners.
+    """
+    from .graph import PointDirectedGraph
+
+    if len(near_closest_to_origin) != 3 or len(far_opposite_corner) != 3:
+        raise ValueError('Only 3D bounding cuboids can be created.')
+
+    adjacency_matrix = csr_matrix(
+        ([1] * 12,
+         ([0, 1, 2, 3, 0, 1, 2, 3, 4, 5, 6, 7],
+          [1, 2, 3, 0, 4, 5, 6, 7, 5, 6, 7, 4])), shape=(8, 8))
+    cuboid = np.array(
+        [near_closest_to_origin, [far_opposite_corner[0],
+                                  near_closest_to_origin[1],
+                                  near_closest_to_origin[2]],
+         [far_opposite_corner[0],
+          far_opposite_corner[1],
+          near_closest_to_origin[2]], [near_closest_to_origin[0],
+                                       far_opposite_corner[1],
+                                       near_closest_to_origin[2]],
+         [near_closest_to_origin[0],
+          near_closest_to_origin[1],
+          far_opposite_corner[2]], [far_opposite_corner[0],
+                                    near_closest_to_origin[1],
+                                    far_opposite_corner[2]],
+         far_opposite_corner, [near_closest_to_origin[0],
+                               far_opposite_corner[1],
+                               far_opposite_corner[2]]], dtype=np.float)
+    return PointDirectedGraph(cuboid, adjacency_matrix, copy=False)
+
+
 class PointCloud(Shape):
     r"""
     An N-dimensional point cloud. This is internally represented as an `ndarray`
@@ -315,8 +363,8 @@ class PointCloud(Shape):
     def bounding_box(self):
         r"""
         Return a bounding box from two corner points as a directed graph.
-        The the first point (0) should be nearest the origin.
-        In the case of an image, this ordering would appear as:
+        In the case of a 2D pointcloud, first point (0) should be nearest the
+        origin. In the case of an image, this ordering would appear as:
 
         ::
 
@@ -336,16 +384,23 @@ class PointCloud(Shape):
             v   |
             0-->1
 
+        In the case of a 3D pointcloud, the first point (0) should be the
+        near closest to the origin and the second point is the far opposite
+        corner.
+
         Returns
         -------
         bounding_box : :map:`PointDirectedGraph`
             The axis aligned bounding box of the PointCloud.
         """
-        if self.n_dims != 2:
-            raise ValueError('Bounding boxes are only supported for 2D '
+        if self.n_dims != 2 and self.n_dims != 3:
+            raise ValueError('Bounding boxes are only supported for 2D or 3D '
                              'pointclouds.')
         min_p, max_p = self.bounds()
-        return bounding_box(min_p, max_p)
+        if self.n_dims == 2:
+            return bounding_box(min_p, max_p)
+        elif self.n_dims == 3:
+            return bounding_cuboid(min_p, max_p)
 
     def _view_2d(self, figure_id=None, new_figure=False, image_view=True,
                  render_markers=True, marker_style='o', marker_size=5,
@@ -767,7 +822,9 @@ class PointCloud(Shape):
 
         return landmark_view
 
-    def _view_3d(self, figure_id=None, new_figure=False):
+    def _view_3d(self, figure_id=None, new_figure=True, marker_style='sphere',
+                 marker_size=None, marker_colour=(1, 0, 0), marker_resolution=8,
+                 step=None, alpha=1.0):
         r"""
         Visualization of the PointCloud in 3D.
 
@@ -777,16 +834,42 @@ class PointCloud(Shape):
             The id of the figure to be used.
         new_figure : `bool`, optional
             If ``True``, a new figure is created.
+        marker_style : `str`, optional
+            The style of the markers.
+            Example options ::
+
+                {2darrow, 2dcircle, 2dcross, 2ddash, 2ddiamond, 2dhooked_arrow,
+                 2dsquare, 2dthick_arrow, 2dthick_cross, 2dtriangle, 2dvertex,
+                 arrow, axes, cone, cube, cylinder, point, sphere}
+
+        marker_size : `float` or ``None``, optional
+            The size of the markers. This size can be seen as a scale factor
+            applied to the size markers, which is by default calculated from
+            the inter-marker spacing. If ``None``, then an optimal marker size
+            value will be set automatically.
+        marker_colour : `(float, float, float)`, optional
+            The colour of the markers as a tuple of RGB values.
+        marker_resolution : `int`, optional
+            The resolution of the markers. For spheres, for instance, this is
+            the number of divisions along theta and phi.
+        step : `int` or ``None``, optional
+            If `int`, then one every `step` vertexes will be rendered.
+            If ``None``, then all vertexes will be rendered.
+        alpha : `float`, optional
+            Defines the transparency (opacity) of the object.
 
         Returns
         -------
-        viewer : PointCloudViewer3d
-            The Menpo3D viewer object.
+        renderer : `menpo3d.visualize.PointCloudViewer3d`
+            The Menpo3D rendering object.
         """
         try:
             from menpo3d.visualize import PointCloudViewer3d
             return PointCloudViewer3d(figure_id, new_figure,
-                                      self.points).render()
+                                      self.points).render(
+                marker_style=marker_style, marker_size=marker_size,
+                marker_colour=marker_colour,
+                marker_resolution=marker_resolution, step=step, alpha=alpha)
         except ImportError:
             from menpo.visualize import Menpo3dMissingError
             raise Menpo3dMissingError()
